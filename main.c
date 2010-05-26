@@ -37,21 +37,22 @@ __CONFIG (LVPDIS);
 #define DATA_ADDR	RC1	/* pin 8 (0=address, 1=data) */
 #define DATA_DOWN	RC2	/* pin 2 (data read by pic) */
 #define PCLR		RC3	/* pin 16 (active low) */
+
 #define DATA_UP		RC4	/* pin 11 (data written by pic) */
 
-static char ds[8];
-enum { DS1=0, DS2=1, DS3=2, DS4=3, DS5=4, DS6=5, DS7=6, DS8=7 };
 
 void
 catchar (char *s, char c)
 {
-    int l = strlen (s);
+    int i = 0;
 
-    s[l - 1] = c;
-    s[l] = '\0';
+    while (s[i] != '\0')
+        i++;
+    s[i++] = c;
+    s[i] = '\0';
 }
 
-/* Decode seven segment LED: decimal, digit
+/* Decode seven segment LED: decimal pt., digit
  */
 void
 sseg2char (unsigned char seg, char *s)
@@ -59,7 +60,7 @@ sseg2char (unsigned char seg, char *s)
     char c;
 
     if (((~seg) >> 7) == 1)
-	catchar (s, '.');
+	    catchar (s, '.');
     switch ((~seg) & 0x7f) {
         case 0x3f: c = '0'; break;
         case 0x06: c = '1'; break;
@@ -70,7 +71,7 @@ sseg2char (unsigned char seg, char *s)
         case 0x7c: c = '6'; break;
         case 0x07: c = '7'; break;
         case 0x7f: c = '8'; break;
-        default:   c = ' '; break;
+        default:   c = 'x'; break;
     }
     catchar (s, c);
 }
@@ -86,92 +87,91 @@ fseg2char (unsigned char seg, char *s)
         case 1:    c = '-'; break;
         case 6:    c = '1'; break;
         case 7:    c = '+'; break;
-        default:   c = ' '; break;
+        default:   c = 'x'; break;
     }
     catchar (s, c);
     switch (((~seg) & 3)) {
         case 3:    c = '1'; break;
-        default:   c = ' '; break;
+        default:   c = 'x'; break;
     }
     catchar (s, c);
 }
 
 void
-update_lcd (void)
+update_display (unsigned char *data)
 {
-    char s[20];
+    char s[21];
 
     *s = '\0';
-    fseg2char (ds[DS8], s);
-    sseg2char (ds[DS7], s);
-    sseg2char (ds[DS6], s);
-    sseg2char (ds[DS5], s);
-    strcat (s, "volts ");
-    fseg2char (ds[DS4], s);
-    sseg2char (ds[DS3], s);
-    sseg2char (ds[DS2], s);
-    sseg2char (ds[DS1], s);
-    strcat (s, "amps");
+    fseg2char (data[0xf], s);
+    sseg2char (data[0xe], s);
+    sseg2char (data[0xd], s);
+    sseg2char (data[0xc], s);
+    strcat (s, "V ");
+    fseg2char (data[0xb], s);
+    sseg2char (data[0xa], s);
+    sseg2char (data[0x9], s);
+    sseg2char (data[0x8], s);
+    strcat (s, "A ");
 
     lcd_goto (0);	// select first line
     lcd_puts (s);
 }
 
-int
-pollit (void)
+void
+shiftin (unsigned char *cp, unsigned char val)
 {
-    unsigned char addr = 0;
-    char addr_bits = 0;
-    unsigned char data = 0;
-    char data_bits = 0;
-    int res = 0;
-
-    if (!IO_CLOCK && !DATA_ADDR) { /* addr */
-        lcd_goto (0x40); lcd_puts ("*");
-        if (addr_bits == 8)
-            addr_bits = 0;
-        addr_bits = 0;
-        addr & (DATA_DOWN << addr_bits++);
-    }
-    if (!IO_CLOCK && DATA_ADDR) { /* data */
-        lcd_goto (0x41); lcd_puts ("*");
-        if (data_bits == 8)
-            data_bits = 0;
-        data & (DATA_DOWN << data_bits++);
-    }
-    while (!IO_CLOCK)
-        ;
-    if (addr_bits == 8 && data_bits == 8) {
-        switch (addr) {
-            case 0x18: /* DS1 */
-            case 0x19: /* DS2 */
-            case 0x1a: /* DS3 */
-            case 0x1b: /* DS4 */
-            case 0x1c: /* DS5 */
-            case 0x1d: /* DS6 */
-            case 0x1e: /* DS7 */
-            case 0x1f: /* DS8 */
-                ds[addr - 0x18 - 1] = data;
-                res = 1;
-                break;
-        }
-    }
-    return res;
+    if (val)
+        *cp = (*cp << 1) | 0x01;
+    else
+        *cp = (*cp << 1) & 0xfe;
 }
 
 
 void
 main(void)
 {
+    unsigned char c;
+    unsigned char clock;
+    unsigned char data[16];
+    unsigned char address;
+
     TRISA = 0;
     TRISB = 0;
-    TRISC = 0x0f; /* RC3:0 are inputs */
+    TRISC = 0x0f;               /* RC3:0 are inputs */
+
     lcd_init ();
-    lcd_goto (0);	// select first line
-    lcd_puts ("hello world");
+
+    memset (&data, 0, sizeof (data));
+    clock = 0;
+    address = 0;
+
+    lcd_goto (0);
+    lcd_puts ("I am");
+    lcd_goto (0x40);
+    lcd_puts ("alive...");
+
     for (;;) {
-        if (pollit())
-            update_lcd();
+        c = PORTC;
+#if 0
+        if (!((c >> 3) & 1)) {  /* PCLR active */
+            memset (&data, 0, sizeof (data));
+            clock = 0;
+            address = 0;
+        }
+#endif
+        if ((c & 1)) {          /* IO_CLOCK inactive */
+            if (clock != 0)
+                update_display (data); /* gack!  this is too slow */
+            clock = 0;
+        } else if (clock == 0) {/* IO_CLOCK transition to active */
+            clock = 1;
+            if ((c >> 1) & 1) { /* DATA_ADDR == 1 (data) */
+                shiftin (&data[address & 0xf], (c >> 2) & 1);
+            } else {            /* DATA_ADDR == 0 (address) */
+                shiftin (&address, (c >> 2) & 1);
+            }
+        }
     }
 }
 
