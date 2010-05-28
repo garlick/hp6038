@@ -1,10 +1,18 @@
+#ifndef _XTAL_FREQ
+ // Unless specified elsewhere, 4MHz system frequency is assumed
+ #define _XTAL_FREQ 4000000
+#endif
+
 #include <htc.h>
 #include <string.h>
+#include <stdio.h>
 #include "lcd.h"
+#include "delay.h"
 
 #if defined(_16F873A)
 // must turn off LVP to make RB3 an I/O port
-__CONFIG (LVPDIS);
+__CONFIG (XT & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
+             & WRTEN & DEBUGDIS & UNPROTECT);
 #endif
 
 /* Mode indicators:
@@ -33,14 +41,23 @@ __CONFIG (LVPDIS);
  * 0x1F CS15  DS8 0:e 1:d 2:c 3:b 4:a
  */
 
-#define IO_CLOCK	RC0	/* pin 5 (0=data_down valid) */
-#define DATA_ADDR	RC1	/* pin 8 (0=address, 1=data) */
-#define DATA_DOWN	RC2	/* pin 2 (data read by pic) */
-#define PCLR		RC3	/* pin 16 (active low) */
+#define HP_IOCLOCK	RB0	/* pin 5 (0=data_down valid) */
+#define HP_DA	    RB1	/* pin 8 (0=address, 1=data) */
+#define HP_DATADOWN	RB2	/* pin 2 (data read by pic) */
+#define HP_PCLR		RB3	/* pin 16 (active low) */
 
-#define DATA_UP		RC4	/* pin 11 (data written by pic) */
+#define HP_DATAUP	RB4	/* pin 11 (data written by pic) */
 
+static unsigned char data[16];
+static unsigned char addr;
 
+static unsigned char indata;
+static unsigned char indata_bits;
+
+static unsigned char inaddr;
+
+/* Append character to string. 
+ */
 void
 catchar (char *s, char c)
 {
@@ -97,8 +114,10 @@ fseg2char (unsigned char seg, char *s)
     catchar (s, c);
 }
 
+/* Update the LCD display
+ */
 void
-update_display (unsigned char *data)
+update_display ()
 {
     char s[21];
 
@@ -107,19 +126,44 @@ update_display (unsigned char *data)
     sseg2char (data[0xe], s);
     sseg2char (data[0xd], s);
     sseg2char (data[0xc], s);
-    strcat (s, "V ");
+    strcat (s, "V   ");
     fseg2char (data[0xb], s);
     sseg2char (data[0xa], s);
     sseg2char (data[0x9], s);
     sseg2char (data[0x8], s);
-    strcat (s, "A ");
+    strcat (s, "A");
 
     lcd_goto (0);	// select first line
     lcd_puts (s);
 }
 
 void
-shiftin (unsigned char *cp, unsigned char val)
+update_display_raw ()
+{
+    char s[21];
+
+    sprintf (s, "%2x%2x%2x%2x %2x%2x%2x%2x",
+        data[0xf],
+        data[0xe],
+        data[0xd],
+        data[0xc],
+        data[0xb],
+        data[0xa],
+        data[0x9],
+        data[0x8]);
+    lcd_goto (0x40);
+    lcd_puts (s);
+}
+
+pclr (void)
+{
+    memset (&data, 0, sizeof (data));
+    addr = inaddr = indata = 0;
+    indata_bits = 0;
+}
+
+void
+shift_in (unsigned char *cp, unsigned char val)
 {
     if (val)
         *cp = (*cp << 1) | 0x01;
@@ -128,50 +172,60 @@ shiftin (unsigned char *cp, unsigned char val)
 }
 
 
+static void interrupt
+isr (void)
+{
+    if (INTF) {
+        RC7 = 1;
+        if (HP_DA) {    /* data */
+            if (addr == 2) {
+                /* outdata */
+            } else {
+                indata = (indata << 1) & 0xfe; 
+                indata |= (~HP_DATADOWN) & 1;
+                if (++indata_bits == 8) {
+                    data[addr] = indata;
+                    indata_bits = 0;
+                }
+            }
+        } else {        /* addr */
+            inaddr = (inaddr << 1) & 0xfe;
+            inaddr |= (~HP_DATADOWN) & 1;
+            if (inaddr & 0x10) {
+                addr = inaddr & 0xf;
+                inaddr = 0;
+            }
+        }
+        INTF = 0;
+    }
+}
+
 void
 main(void)
 {
-    unsigned char c;
-    unsigned char clock;
-    unsigned char data[16];
-    unsigned char address;
+    ADCON1 = 0x06;
 
     TRISA = 0;
-    TRISB = 0;
-    TRISC = 0x0f;               /* RC3:0 are inputs */
+    TRISB = 0x0f; /* RB3:0 inputs */
+    TRISC = 0;
 
     lcd_init ();
 
-    memset (&data, 0, sizeof (data));
-    clock = 0;
-    address = 0;
-
-    lcd_goto (0);
-    lcd_puts ("I am");
-    lcd_goto (0x40);
-    lcd_puts ("alive...");
+    pclr ();
+    INTF = 0;
+    INTEDG = 0;
+    INTE = 1;
+    GIE = 1;
 
     for (;;) {
-        c = PORTC;
-#if 0
-        if (!((c >> 3) & 1)) {  /* PCLR active */
-            memset (&data, 0, sizeof (data));
-            clock = 0;
-            address = 0;
-        }
-#endif
-        if ((c & 1)) {          /* IO_CLOCK inactive */
-            if (clock != 0)
-                update_display (data); /* gack!  this is too slow */
-            clock = 0;
-        } else if (clock == 0) {/* IO_CLOCK transition to active */
-            clock = 1;
-            if ((c >> 1) & 1) { /* DATA_ADDR == 1 (data) */
-                shiftin (&data[address & 0xf], (c >> 2) & 1);
-            } else {            /* DATA_ADDR == 0 (address) */
-                shiftin (&address, (c >> 2) & 1);
-            }
-        }
+        RC6 = 1;
+        update_display ();
+        update_display_raw ();
+        __delay_ms (197);
+        __delay_ms (197);
+        RC5 = 0;
+        RC6 = 0;
+        RC7 = 0;
     }
 }
 

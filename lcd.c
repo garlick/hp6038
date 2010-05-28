@@ -6,7 +6,7 @@
  *	the hardware connected as follows (the standard 14 pin 
  *	LCD connector is used):
  *	
- *	PORTB bits 0-3 are connected to the LCD data bits 4-7 (high nibble)
+ *	PORTC bits 0-3 are connected to the LCD data bits 4-7 (high nibble)
  *	PORTA bit 3 is connected to the LCD RS input (register select)
  *	PORTA bit 1 is connected to the LCD EN bit (enable)
  *	
@@ -20,7 +20,6 @@
  #define _XTAL_FREQ 4000000
 #endif
 
-
 #include	<htc.h>
 #include	"lcd.h"
 
@@ -28,7 +27,7 @@
 #define	LCD_RW RA2
 #define LCD_EN RA1
 
-#define LCD_DATA	PORTB
+#define LCD_DATA	PORTC
 
 #define	LCD_STROBE()	((LCD_EN = 1),(LCD_EN=0))
 
@@ -93,11 +92,7 @@ lcd_init()
 {
 	char init_value;
 
-	ADCON1 = 0x06;	// Disable analog pins on PORTA
-
 	init_value = 0x3;
-	TRISA=0;
-	TRISB=0;
 	LCD_RS = 0;
 	LCD_EN = 0;
 	LCD_RW = 0;
