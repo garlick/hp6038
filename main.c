@@ -49,12 +49,7 @@ __CONFIG (XT & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
 #define HP_DATAUP	RB4	/* pin 11 (data written by pic) */
 
 static unsigned char data[16];
-static unsigned char addr;
 
-static unsigned char indata;
-static unsigned char indata_bits;
-
-static unsigned char inaddr;
 
 /* Append character to string. 
  */
@@ -88,6 +83,11 @@ sseg2char (unsigned char seg, char *s)
         case 0x7c: c = '6'; break;
         case 0x07: c = '7'; break;
         case 0x7f: c = '8'; break;
+#if 0
+        case 0x7f: c = 'C'; break;
+        case 0x7f: c = 'H'; break;
+        case 0x7f: c = 'L'; break;
+#endif
         default:   c = 'x'; break;
     }
     catchar (s, c);
@@ -142,58 +142,50 @@ update_display_raw ()
 {
     char s[21];
 
-    sprintf (s, "%2x%2x%2x%2x %2x%2x%2x%2x",
-        data[0xf],
-        data[0xe],
-        data[0xd],
-        data[0xc],
-        data[0xb],
-        data[0xa],
-        data[0x9],
-        data[0x8]);
+    sprintf (s, "%.2x%.2x %.2x%.2x %.2x%.2x %.2x%.2x",
+        data[0x0], data[0x1], data[0x2], data[0x3],
+        data[0x4], data[0x5], data[0x6], data[0x7]);
+    lcd_goto (0);
+    lcd_puts (s);
+
+    sprintf (s, "%.2x%.2x %.2x%.2x %.2x%.2x %.2x%.2x",
+        data[0x8], data[0x9], data[0xa], data[0xb],
+        data[0xc], data[0xd], data[0xe], data[0xf]);
     lcd_goto (0x40);
     lcd_puts (s);
 }
 
-pclr (void)
-{
-    memset (&data, 0, sizeof (data));
-    addr = inaddr = indata = 0;
-    indata_bits = 0;
-}
 
-void
-shift_in (unsigned char *cp, unsigned char val)
-{
-    if (val)
-        *cp = (*cp << 1) | 0x01;
-    else
-        *cp = (*cp << 1) & 0xfe;
-}
-
-
+/* Called when HP_IOCLOCK goes low */
 static void interrupt
 isr (void)
 {
+    static unsigned char addr = 0;
+    static unsigned char indata = 0;
+    static unsigned char outdata;
+    static unsigned i = 0;
+    static unsigned j = 0;
+        
     if (INTF) {
         RC7 = 1;
-        if (HP_DA) {    /* data */
-            if (addr == 2) {
-                /* outdata */
-            } else {
-                indata = (indata << 1) & 0xfe; 
-                indata |= (~HP_DATADOWN) & 1;
-                if (++indata_bits == 8) {
-                    data[addr] = indata;
-                    indata_bits = 0;
-                }
-            }
-        } else {        /* addr */
-            inaddr = (inaddr << 1) & 0xfe;
-            inaddr |= (~HP_DATADOWN) & 1;
-            if (inaddr & 0x10) {
-                addr = inaddr & 0xf;
-                inaddr = 0;
+        if (!HP_PCLR) {             /* p/s clears our logic */
+            RC5 = 1;
+            addr = 0;
+            indata = 0;
+            i = 0;
+            //memset (data, 0, sizeof (data));     
+        } else if (!HP_DA) {        /* p/s writes address bit */
+            addr <<= 1;
+            addr |= ~HP_DATADOWN;
+        } else if (addr == 0x12) {  /* p/s reads data bit */
+        } else {                    /* p/s writes data bit */
+	    data[addr & 0xf] = 0xff;
+            indata <<= 1;
+            indata |= ~HP_DATADOWN;
+            if (++i == 8) {
+                if ((addr & 0x10))
+                    data[addr & 0xf] = indata;
+                i = 0;
             }
         }
         INTF = 0;
@@ -211,21 +203,25 @@ main(void)
 
     lcd_init ();
 
-    pclr ();
+    memset (data, 0, sizeof (data));     
+
     INTF = 0;
-    INTEDG = 0;
+    INTEDG = 0; /* interrupt on falling edge of HP_IOCLOCK */
     INTE = 1;
     GIE = 1;
 
+    HP_DATAUP = 1; /* safe startup state (like missing front panel) */
+
     for (;;) {
         RC6 = 1;
-        update_display ();
+        //update_display ();
         update_display_raw ();
         __delay_ms (197);
         __delay_ms (197);
-        RC5 = 0;
-        RC6 = 0;
-        RC7 = 0;
+        RC5 = 0;    /* pclr */
+        RC6 = 0;    /* update loop */
+        RC7 = 0;    /* interrupt */
+
     }
 }
 
