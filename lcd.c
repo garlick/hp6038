@@ -6,7 +6,7 @@
  *	the hardware connected as follows (the standard 14 pin 
  *	LCD connector is used):
  *	
- *	PORTC bits 0-3 are connected to the LCD data bits 4-7 (high nibble)
+ *	PORTB bits 0-3 are connected to the LCD data bits 4-7 (high nibble)
  *	PORTA bit 3 is connected to the LCD RS input (register select)
  *	PORTA bit 1 is connected to the LCD EN bit (enable)
  *	
@@ -27,7 +27,7 @@
 #define	LCD_RW RA2
 #define LCD_EN RA1
 
-#define LCD_DATA	PORTC
+#define LCD_DATA	PORTB
 
 #define	LCD_STROBE()	((LCD_EN = 1),(LCD_EN=0))
 

@@ -41,12 +41,12 @@ __CONFIG (XT & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
  * 0x1F CS15  DS8 0:e 1:d 2:c 3:b 4:a
  */
 
-#define HP_IOCLOCK	RB0	/* pin 5 (0=data_down valid) */
-#define HP_DA	    RB1	/* pin 8 (0=address, 1=data) */
-#define HP_DATADOWN	RB2	/* pin 2 (data read by pic) */
-#define HP_PCLR		RB3	/* pin 16 (active low) */
+#define HP_DA	    	RC2	/* pin 8 (0=address, 1=data) */
+#define HP_IOCLOCK	RC3	/* pin 5 (0=HP_DATADOWN valid) */
+#define HP_DATADOWN	RC4	/* pin 2 (data read by pic) */
+#define HP_DATAUP	RC5	/* pin 11 (data written by pic) */
+#define HP_PCLR		RC6	/* pin 16 (active low) */
 
-#define HP_DATAUP	RB4	/* pin 11 (data written by pic) */
 
 static unsigned char data[16];
 
@@ -155,40 +155,26 @@ update_display_raw ()
     lcd_puts (s);
 }
 
-
-/* Called when HP_IOCLOCK goes low */
 static void interrupt
-isr (void)
+ssp_intr (void)
 {
+    static bit state = 0;
     static unsigned char addr = 0;
-    static unsigned char indata = 0;
-    static unsigned char outdata;
-    static unsigned i = 0;
-    static unsigned j = 0;
-        
-    if (INTF) {
-        RC7 = 1;
-        if (!HP_PCLR) {             /* p/s clears our logic */
-            RC5 = 1;
-            addr = 0;
-            indata = 0;
-            i = 0;
-            //memset (data, 0, sizeof (data));     
-        } else if (!HP_DA) {        /* p/s writes address bit */
-            addr <<= 1;
-            addr |= ~HP_DATADOWN;
-        } else if (addr == 0x12) {  /* p/s reads data bit */
-        } else {                    /* p/s writes data bit */
-	    data[addr & 0xf] = 0xff;
-            indata <<= 1;
-            indata |= ~HP_DATADOWN;
-            if (++i == 8) {
-                if ((addr & 0x10))
-                    data[addr & 0xf] = indata;
-                i = 0;
+
+    if (SSPIF) {
+	/* FIXME: read HP_DA instead of state var? */
+	RC7 = 1;
+        if (!state)
+            addr = SSPBUF;
+        else {
+            if (addr == 0x12) {
+                /* xmit */
+            } else if (addr & 0x10) {
+	        data[addr & 0x0f] = SSPBUF;
             }
-        }
-        INTF = 0;
+	}
+        state = !state;
+        SSPIF = 0;
     }
 }
 
@@ -198,30 +184,33 @@ main(void)
     ADCON1 = 0x06;
 
     TRISA = 0;
-    TRISB = 0x0f; /* RB3:0 inputs */
-    TRISC = 0;
+    TRISB = 0;
+    TRISC = 0b01011100; /* RC2, RC3, RC4, RC6 are inputs */
 
     lcd_init ();
 
     memset (data, 0, sizeof (data));     
 
-    INTF = 0;
-    INTEDG = 0; /* interrupt on falling edge of HP_IOCLOCK */
-    INTE = 1;
-    GIE = 1;
+    while (!HP_PCLR)	/* wait for p/s to come out of reset */
+        ;
 
-    HP_DATAUP = 1; /* safe startup state (like missing front panel) */
+    SSPEN = 0;
+    SSPCON = 0b00010101;/* WCOL=0, SSPOV=0, SSPEN=0, CKP=1, SSPM=0101 */
+    SSPSTAT = 0;	/* CKE=0 */
+    SSPEN = 1;
 
+    SSPIF = 0;		/* clear SSP interrupt flag */
+    SSPIE = 1;		/* enable SSP interrupt */
+    PEIE = 1;		/* enable peripheral interupts */
+    GIE = 1;		/* enable global interrupts */
+
+    BF = 0;
     for (;;) {
-        RC6 = 1;
-        //update_display ();
-        update_display_raw ();
+        update_display ();
+        //update_display_raw ();
         __delay_ms (197);
         __delay_ms (197);
-        RC5 = 0;    /* pclr */
-        RC6 = 0;    /* update loop */
-        RC7 = 0;    /* interrupt */
-
+	RC7 = 0;
     }
 }
 
