@@ -11,7 +11,8 @@
 
 #if defined(_16F873A)
 // must turn off LVP to make RB3 an I/O port
-__CONFIG (XT & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
+// HS or XT (<= 4MHZ) 
+__CONFIG (HS & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
              & WRTEN & DEBUGDIS & UNPROTECT);
 #endif
 
@@ -156,24 +157,20 @@ update_display_raw ()
 }
 
 static void interrupt
-ssp_intr (void)
+isr (void)
 {
-    static bit state = 0;
+    int is_address = !HP_DA; /* read it fast - timing is tight! */
     static unsigned char addr = 0;
+    char b;
 
     if (SSPIF) {
-	/* FIXME: read HP_DA instead of state var? */
-	RC7 = 1;
-        if (!state)
-            addr = SSPBUF;
-        else {
-            if (addr == 0x12) {
-                /* xmit */
-            } else if (addr & 0x10) {
-	        data[addr & 0x0f] = SSPBUF;
-            }
-	}
-        state = !state;
+        b = ~SSPBUF;	/* read SSPBUF no matter what (else overflow) */
+        if (is_address) {
+            addr = b;
+	} else {
+            if (addr & 0x10)
+                data[addr & 0x0f] = b;
+        }
         SSPIF = 0;
     }
 }
@@ -191,26 +188,32 @@ main(void)
 
     memset (data, 0, sizeof (data));     
 
-    while (!HP_PCLR)	/* wait for p/s to come out of reset */
+    while (!HP_PCLR)    /* wait for p/s to come out of reset */
         ;
 
-    SSPEN = 0;
-    SSPCON = 0b00010101;/* WCOL=0, SSPOV=0, SSPEN=0, CKP=1, SSPM=0101 */
-    SSPSTAT = 0;	/* CKE=0 */
-    SSPEN = 1;
+    /* SSPCON */
+    SSPEN = 0;          /* disable SSP (clears shift reg) */
+    SSPM3=0; SSPM2=1; SSPM1=0; SSPM0 = 1; /* select slave mode w/o SS */
+    CKP = 1;            /* clock polarity: idle state is H */
 
-    SSPIF = 0;		/* clear SSP interrupt flag */
-    SSPIE = 1;		/* enable SSP interrupt */
-    PEIE = 1;		/* enable peripheral interupts */
-    GIE = 1;		/* enable global interrupts */
+    /* SSPSTAT */
+    CKE = 0;            /* data transmitted on the rising edge of SCK */
 
-    BF = 0;
+    SSPEN = 1;          /* enable SSP */
+
+    /* Interrupts */
+    SSPIF = 0;          /* clear SSP interrupt flag */
+    SSPIE = 1;          /* enable SSP interrupt */
+    PEIE = 1;           /* enable peripheral interupts */
+    GIE = 1;            /* enable global interrupts */
+
     for (;;) {
-        update_display ();
-        //update_display_raw ();
-        __delay_ms (197);
-        __delay_ms (197);
-	RC7 = 0;
+        //update_display ();
+        update_display_raw ();
+        __delay_ms (100);
+        __delay_ms (100);
+        __delay_ms (100);
+        __delay_ms (100);
     }
 }
 

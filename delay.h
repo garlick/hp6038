@@ -27,7 +27,8 @@
  */
 
 #ifndef	XTAL_FREQ
-#define	XTAL_FREQ	4MHZ		/* Crystal frequency in MHz */
+//#define XTAL_FREQ	4MHZ		/* Crystal frequency in MHz */
+#define XTAL_FREQ	24MHZ		/* Crystal frequency in MHz */
 #endif
 
 #define	MHZ	*1000L			/* number of kHz in a MHz */

@@ -17,7 +17,8 @@
 
 #ifndef _XTAL_FREQ
  // Unless specified elsewhere, 4MHz system frequency is assumed
- #define _XTAL_FREQ 4000000
+ //#define _XTAL_FREQ 4000000
+ #define _XTAL_FREQ 24000000
 #endif
 
 #include	<htc.h>
