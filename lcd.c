@@ -110,7 +110,8 @@ lcd_init()
 	LCD_STROBE();
 
 	lcd_write(0x28); // Set interface length
-	lcd_write(0xF); // Display On, Cursor On, Cursor Blink
+	//lcd_write(0xF); // Display On, Cursor On, Cursor Blink
+	lcd_write(0xc); // Display On, Cursor Off, Cursor No blink
 	lcd_clear();	// Clear screen
 	lcd_write(0x6); // Set entry Mode
 }

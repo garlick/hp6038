@@ -16,130 +16,132 @@ __CONFIG (HS & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
              & WRTEN & DEBUGDIS & UNPROTECT);
 #endif
 
-/* Mode indicators:
- * Address    Bit:Indicator
- * 0x10 CS0   0:CV 1:CC 2:OVERRANGE 3:DISABLE, 4:OV, 5:OT, 6:FOLDBACK, 7:ERROR
- * 0x11 CS1   0:FOLD_EN 1:CURRENT 2:VOLTAGE 3: RMT: 4:LSN 5:TLK 6:SRQ
- */
-
-/* RPG/buttons:
- * CS2
- */
-
-/* Current display (0 = lighted segment)
- * Address    Bit:Segment
- * 0x18 CS8   DS1 0:a 1:b 2:c 3:d 4:e 5:f 6:g 7:DP
- * 0x19 CS9   DS2 0:a 1:b 2:c 3:d 4:e 5:f 6:g 7:DP
- * 0x1A CS10  DS3 0:a 1:b 2:c 3:d 4:e 5:f 6:g 7:DP
- * 0x1B CS11  DS4 0:e 1:d 2:c 3:b 4:a
- */
-
-/* Voltage display (0 = lighted segment)
- * Address    Bit:Segment
- * 0x1C CS12  DS5 0:a 1:b 2:c 3:d 4:e 5:f 6:g 7:DP
- * 0x1D CS13  DS6 0:a 1:b 2:c 3:d 4:e 5:f 6:g 7:DP
- * 0x1E CS14  DS7 0:a 1:b 2:c 3:d 4:e 5:f 6:g 7:DP
- * 0x1F CS15  DS8 0:e 1:d 2:c 3:b 4:a
- */
-
 #define HP_DA	    	RC2	/* pin 8 (0=address, 1=data) */
 #define HP_IOCLOCK	RC3	/* pin 5 (0=HP_DATADOWN valid) */
 #define HP_DATADOWN	RC4	/* pin 2 (data read by pic) */
 #define HP_DATAUP	RC5	/* pin 11 (data written by pic) */
 #define HP_PCLR		RC6	/* pin 16 (active low) */
 
+#define MODE_CV		0x01
+#define MODE_CC		0x02
+#define MODE_OVERRANGE	0x04
+#define MODE_DISABLED  	0x08
+#define MODE_OV         0x10
+#define MODE_OT         0x20
+#define MODE_FOLDBACK   0x40
+#define MODE_ERROR      0x80
+
+#define MODE_FOLDBACK_EN 0x01
+#define MODE_CURRENT    0x02
+#define MODE_VOLTAGE    0x04
+#define MODE_RMT        0x08
+#define MODE_LSN        0x10
+#define MODE_TLK        0x20
+#define MODE_SRQ        0x40
 
 static unsigned char data[16];
 
-
-/* Append character to string. 
- */
-void
-catchar (char *s, char c)
+#ifndef RAW_DISPLAY
+const char *
+seg7str (unsigned char c)
 {
-    int i = 0;
-
-    while (s[i] != '\0')
-        i++;
-    s[i++] = c;
-    s[i] = '\0';
+    switch (c) {
+        case 0x41: return "0";
+	case 0x7d: return "1";
+	case 0x62: return "2";
+	case 0x68: return "3";
+	case 0x5c: return "4";
+	case 0xc8: return "5";
+	case 0xc0: return "6";
+	case 0x6d: return "7";
+	case 0x40: return "8";
+	case 0x48: return "9";
+	case 0x01: return ".0";
+	case 0x3d: return ".1";
+	case 0x22: return ".2";
+	case 0x28: return ".3";
+	case 0x1c: return ".4";
+	case 0x88: return ".5";
+	case 0x80: return ".6";
+	case 0x2d: return ".7";
+	case 0x00: return ".8";
+	case 0x08: return ".9";
+	case 0xc3: return "C";
+	case 0x55: return "H";
+	case 0xd3: return "L";
+	case 0xff: return " ";
+	default:   return "*";
+    }
 }
 
-/* Decode seven segment LED: decimal pt., digit
- */
-void
-sseg2char (unsigned char seg, char *s)
+const char *
+seg5str (unsigned char c)
 {
-    char c;
-
-    if (((~seg) >> 7) == 1)
-	    catchar (s, '.');
-    switch ((~seg) & 0x7f) {
-        case 0x3f: c = '0'; break;
-        case 0x06: c = '1'; break;
-        case 0x5b: c = '2'; break;
-        case 0x4f: c = '3'; break;
-        case 0x66: c = '4'; break;
-        case 0x6d: c = '5'; break;
-        case 0x7c: c = '6'; break;
-        case 0x07: c = '7'; break;
-        case 0x7f: c = '8'; break;
-#if 0
-        case 0x7f: c = 'C'; break;
-        case 0x7f: c = 'H'; break;
-        case 0x7f: c = 'L'; break;
-#endif
-        default:   c = 'x'; break;
+    switch (c) {
+	case 0xe6: return "+";
+	case 0xef: return "-";
+	case 0xf9: return "1";
+	case 0xff: return " ";
+	default:   return "*";
     }
-    catchar (s, c);
-}
-
-/* Decode five segment LED: sign, digit
- */
-void
-fseg2char (unsigned char seg, char *s)
-{
-    char c;
-
-    switch ((~(seg) >> 2) & 7) {
-        case 1:    c = '-'; break;
-        case 6:    c = '1'; break;
-        case 7:    c = '+'; break;
-        default:   c = 'x'; break;
-    }
-    catchar (s, c);
-    switch (((~seg) & 3)) {
-        case 3:    c = '1'; break;
-        default:   c = 'x'; break;
-    }
-    catchar (s, c);
 }
 
 /* Update the LCD display
  */
 void
-update_display ()
+update_display (void)
 {
     char s[21];
+    unsigned char d = ~data[0];
+    unsigned char e = ~data[1];
 
-    *s = '\0';
-    fseg2char (data[0xf], s);
-    sseg2char (data[0xe], s);
-    sseg2char (data[0xd], s);
-    sseg2char (data[0xc], s);
-    strcat (s, "V   ");
-    fseg2char (data[0xb], s);
-    sseg2char (data[0xa], s);
-    sseg2char (data[0x9], s);
-    sseg2char (data[0x8], s);
-    strcat (s, "A");
+    if (data[0xe] == 0xff && data[0xd] == 0xff && data[0xc] == 0xff) {
+        sprintf (s, "===== HP 6038A =====");
 
-    lcd_goto (0);	// select first line
+    } else if (data[0xe] == 0xc3 && data[0xd] == 0x55 && data[0xc] == 0xd3) {
+        sprintf (s, "GP-IB channel %s%s",
+                 seg7str (data[0x9]), seg7str (data[0x8]));
+
+    } else if (data[0x8] == 0xff && data[0x9] == 0xff && data[0xa] == 0xff) {
+        sprintf (s, "OVP %s%s%s%sV",
+                 seg5str (data[0xf]), seg7str (data[0xe]),
+                 seg7str (data[0xd]), seg7str (data[0xc]));
+
+    } else {
+        sprintf (s, "%s%s%s%s%c %s%s%s%s%c",
+                 seg5str (data[0xf]), seg7str (data[0xe]),
+                 seg7str (data[0xd]), seg7str (data[0xc]),
+                 (e & MODE_VOLTAGE) ? 'V' : 'v',
+                 seg5str (data[0xb]), seg7str (data[0xa]),
+                 seg7str (data[0x9]), seg7str (data[0x8]),
+                 (e & MODE_CURRENT) ? 'A' : 'a');
+    }
+    if (!strncmp (s, " .", 2))
+        s[0] = '0';
+    while (strlen (s) < 20)
+        strcat (s, " ");
+
+    lcd_goto (0);
     lcd_puts (s);
-}
 
+    sprintf (s, "%s %s %s  %s",
+             (d & MODE_CV) ? "cv" : "  ",
+             (d & MODE_CC) ? "cc" : "  ",
+             (e & MODE_FOLDBACK_EN) ? "fb" : "  ",
+             (d & MODE_OV)                                    ? " OVERVOLT!" 
+                                       : (d & MODE_OT)        ? " OVERTEMP!"
+                                       : (d & MODE_OVERRANGE) ? "OVERRANGE!"
+                                       : (d & MODE_DISABLED)  ? " DISABLED!"
+                                       : (d & MODE_FOLDBACK)  ? " FOLDBACK!"
+                                       : (d & MODE_ERROR)     ? "    ERROR!"
+                                       :                        "          ");
+    lcd_goto (0x40);
+    lcd_puts (s);
+
+}
+#else
 void
-update_display_raw ()
+update_display (void)
 {
     char s[21];
 
@@ -155,6 +157,7 @@ update_display_raw ()
     lcd_goto (0x40);
     lcd_puts (s);
 }
+#endif
 
 static void interrupt
 isr (void)
@@ -186,7 +189,7 @@ main(void)
 
     lcd_init ();
 
-    memset (data, 0, sizeof (data));     
+    memset (data, 0xff, sizeof (data));     
 
     while (!HP_PCLR)    /* wait for p/s to come out of reset */
         ;
@@ -208,8 +211,7 @@ main(void)
     GIE = 1;            /* enable global interrupts */
 
     for (;;) {
-        //update_display ();
-        update_display_raw ();
+        update_display ();
         __delay_ms (100);
         __delay_ms (100);
         __delay_ms (100);
