@@ -10,13 +10,13 @@
 void
 DelayMs(unsigned char cnt)
 {
-#if	XTAL_FREQ <= 2MHZ
+#if	_XTAL_FREQ <= 2MHZ
 	do {
 		DelayUs(996);
 	} while(--cnt);
 #endif
 
-#if    XTAL_FREQ > 2MHZ	
+#if    _XTAL_FREQ > 2MHZ	
 	unsigned char	i;
 	do {
 		i = 4;

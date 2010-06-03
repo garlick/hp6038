@@ -1,8 +1,3 @@
-#ifndef _XTAL_FREQ
- // Unless specified elsewhere, 4MHz system frequency is assumed
- #define _XTAL_FREQ 4000000
-#endif
-
 #include <htc.h>
 #include <string.h>
 #include <stdio.h>
@@ -10,16 +5,14 @@
 #include "delay.h"
 
 #if defined(_16F873A)
-// must turn off LVP to make RB3 an I/O port
-// HS or XT (<= 4MHZ) 
 __CONFIG (HS & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
              & WRTEN & DEBUGDIS & UNPROTECT);
 #endif
 
-#define HP_DA	    	RC2	/* pin 8 (0=address, 1=data) */
-#define HP_IOCLOCK	RC3	/* pin 5 (0=HP_DATADOWN valid) */
-#define HP_DATADOWN	RC4	/* pin 2 (data read by pic) */
-#define HP_DATAUP	RC5	/* pin 11 (data written by pic) */
+#define HP_DA	    	RC2	/* pin 8 (L=address, H=data) */
+#define HP_IOCLOCK	RC3	/* pin 5 */
+#define HP_DATADOWN	RC4	/* pin 2 (ps->pic) */
+#define HP_DATAUP	RC5	/* pin 11 (pic->ps) */
 #define HP_PCLR		RC6	/* pin 16 (active low) */
 
 #define MODE_CV		0x01
@@ -86,8 +79,6 @@ seg5str (unsigned char c)
     }
 }
 
-/* Update the LCD display
- */
 void
 update_display (void)
 {
@@ -99,7 +90,7 @@ update_display (void)
         sprintf (s, "===== HP 6038A =====");
 
     } else if (data[0xe] == 0xc3 && data[0xd] == 0x55 && data[0xc] == 0xd3) {
-        sprintf (s, "GP-IB channel %s%s",
+        sprintf (s, "HP-IB channel %s%s",
                  seg7str (data[0x9]), seg7str (data[0x8]));
 
     } else if (data[0x8] == 0xff && data[0x9] == 0xff && data[0xa] == 0xff) {
@@ -125,16 +116,17 @@ update_display (void)
     lcd_puts (s);
 
     sprintf (s, "%s %s %s  %s",
-             (d & MODE_CV) ? "cv" : "  ",
-             (d & MODE_CC) ? "cc" : "  ",
-             (e & MODE_FOLDBACK_EN) ? "fb" : "  ",
-             (d & MODE_OV)                                    ? " OVERVOLT!" 
-                                       : (d & MODE_OT)        ? " OVERTEMP!"
-                                       : (d & MODE_OVERRANGE) ? "OVERRANGE!"
-                                       : (d & MODE_DISABLED)  ? " DISABLED!"
-                                       : (d & MODE_FOLDBACK)  ? " FOLDBACK!"
-                                       : (d & MODE_ERROR)     ? "    ERROR!"
-                                       :                        "          ");
+             (d & MODE_CV)                ? "cv" : "  ",
+             (d & MODE_CC)                ? "cc" : "  ",
+             (e & MODE_FOLDBACK_EN)       ? "fb" : "  ",
+    /* FIXME:  errors might need to be displayed simultaneously? */
+             (d & MODE_OV)                ? " OVERVOLT!" 
+                   : (d & MODE_OT)        ? " OVERTEMP!"
+                   : (d & MODE_OVERRANGE) ? "OVERRANGE!"
+                   : (d & MODE_DISABLED)  ? " DISABLED!"
+                   : (d & MODE_FOLDBACK)  ? " FOLDBACK!"
+                   : (d & MODE_ERROR)     ? "    ERROR!"
+                   :                        "          ");
     lcd_goto (0x40);
     lcd_puts (s);
 
@@ -170,8 +162,14 @@ isr (void)
         b = ~SSPBUF;	/* read SSPBUF no matter what (else overflow) */
         if (is_address) {
             addr = b;
+            if (addr == 0x12) {
+                SSPBUF = data[2];
+	        TRISC5 = 0;
+            }
 	} else {
-            if (addr & 0x10)
+            if (addr == 0x12)
+                TRISC5 = 1;
+            else if ((addr & 0x10))
                 data[addr & 0x0f] = b;
         }
         SSPIF = 0;
@@ -185,11 +183,12 @@ main(void)
 
     TRISA = 0;
     TRISB = 0;
-    TRISC = 0b01011100; /* RC2, RC3, RC4, RC6 are inputs */
+    TRISC = 0b01111100; /* RC6:2 are inputs */
 
     lcd_init ();
 
     memset (data, 0xff, sizeof (data));     
+    data[2] = 0b11011111; /* TEST: depress 'display settings' */
 
     while (!HP_PCLR)    /* wait for p/s to come out of reset */
         ;
@@ -212,10 +211,7 @@ main(void)
 
     for (;;) {
         update_display ();
-        __delay_ms (100);
-        __delay_ms (100);
-        __delay_ms (100);
-        __delay_ms (100);
+        DelayMs (250);
     }
 }
 

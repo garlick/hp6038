@@ -2,10 +2,12 @@ PICP_TTY=/dev/ttyUSB0
 CHIP=16F873A
 #CHIP=16F77
 #CHIP=16F72
+FREQ=24000000
+SRCS=main.c lcd.c delay.c
 
 
-main.hex: main.c lcd.c delay.c
-	picc --chip=$(CHIP) main.c lcd.c delay.c
+main.hex: $(SRCS)
+	picc -D_XTAL_FREQ=$(FREQ) --chip=$(CHIP) $(SRCS)
 
 clean:
 	rm -f *.hex
