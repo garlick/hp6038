@@ -7,13 +7,49 @@
 #if defined(_16F873A)
 __CONFIG (HS & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
              & WRTEN & DEBUGDIS & UNPROTECT);
+#else
+#error Please configure chip-specific __CONFIG mask
 #endif
 
-#define HP_DA	    	RC2	/* pin 8 (L=address, H=data) */
-#define HP_IOCLOCK	RC3	/* pin 5 */
-#define HP_DATADOWN	RC4	/* pin 2 (ps->pic) */
-#define HP_DATAUP	RC5	/* pin 11 (pic->ps) */
-#define HP_PCLR		RC6	/* pin 16 (active low) */
+/* Define to display 16 register values in hex on the LCD instead
+ * of decoded values.
+ */
+#undef RAW_DISPLAY
+
+
+/**
+ ** PIC parallel port/SPI definitions
+ **/
+
+/* RA0 unused */
+#define LCD_EN		RA1
+#define LCD_RW		RA2
+#define LCD_RS		RA3
+/* RA4 unused */
+/* RA5 unused */
+
+#define LCD_DATA4	RB0
+#define LCD_DATA5	RB1
+#define LCD_DATA6	RB2
+#define LCD_DATA7	RB3
+#define SW_VOLT_CUR	RB4
+#define SW_DISP_OVP	RB5
+#define SW_DISP_SET	RB6
+#define SW_FOLDBACK	RB7
+
+/* RC0 unused */
+/* RC1 unused */
+#define HP_DA	    	RC2	/*           pin 8 (L=address, H=data) */
+#define HP_IOCLOCK	RC3	/* (SPI SCK) pin 5 */
+#define HP_DATADOWN	RC4	/* (SPI SDI) pin 2 (ps->pic) */
+#define HP_DATAUP	RC5	/* (SPI SDO) pin 11 (pic->ps) */
+#define HP_PCLR		RC6	/*           pin 16 (active low) */
+
+#define SW_LOCAL        RC7
+
+/**
+ ** HP 6038A shift register bit definitions
+ **/
 
 #define MODE_CV		0x01
 #define MODE_CC		0x02
@@ -32,10 +68,24 @@ __CONFIG (HS & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
 #define MODE_TLK        0x20
 #define MODE_SRQ        0x40
 
+#define CONT_RPG_CLOCKW	0x01
+#define CONT_RPG_ROTAT	0x02
+#define CONT_LOCAL	0x04
+#define CONT_VOLT_CUR   0x08
+#define CONT_DISP_OVP	0x10
+#define CONT_DISP_SET	0x20
+#define CONT_FOLDBACK	0x40
+
+/* Software versions of HP shift registers
+ * 0x00   mode0   0x08   ds1 (current ones)     0x0c  ds5 (volts ones)
+ * 0x01   mode1   0x09   ds2 (current tens)     0x0d  ds6 (volts tens)
+ * 0x02   cont    0x0a   ds3 (current hundreds) 0x0e  ds7 (volts hundreds)
+ * 0x03-7 unused  0x0b   ds4 (current sign)     0x0f  ds8 (volts sign)
+ */
 static unsigned char data[16];
 
 #ifndef RAW_DISPLAY
-const char *
+static const char *
 seg7str (unsigned char c)
 {
     switch (c) {
@@ -67,7 +117,7 @@ seg7str (unsigned char c)
     }
 }
 
-const char *
+static const char *
 seg5str (unsigned char c)
 {
     switch (c) {
@@ -79,15 +129,16 @@ seg5str (unsigned char c)
     }
 }
 
-void
+static void
 update_display (void)
 {
     char s[21];
     unsigned char d = ~data[0];
     unsigned char e = ~data[1];
+    char dostatus = 0;
 
     if (data[0xe] == 0xff && data[0xd] == 0xff && data[0xc] == 0xff) {
-        sprintf (s, "===== HP 6038A =====");
+        sprintf (s, "HP 6038A front panel");
 
     } else if (data[0xe] == 0xc3 && data[0xd] == 0x55 && data[0xc] == 0xd3) {
         sprintf (s, "HP-IB channel %s%s",
@@ -98,6 +149,7 @@ update_display (void)
                  seg5str (data[0xf]), seg7str (data[0xe]),
                  seg7str (data[0xd]), seg7str (data[0xc]));
 
+        dostatus = 1;
     } else {
         sprintf (s, "%s%s%s%s%c %s%s%s%s%c",
                  seg5str (data[0xf]), seg7str (data[0xe]),
@@ -106,6 +158,7 @@ update_display (void)
                  seg5str (data[0xb]), seg7str (data[0xa]),
                  seg7str (data[0x9]), seg7str (data[0x8]),
                  (e & MODE_CURRENT) ? 'A' : 'a');
+        dostatus = 1;
     }
     if (!strncmp (s, " .", 2))
         s[0] = '0';
@@ -115,24 +168,28 @@ update_display (void)
     lcd_goto (0);
     lcd_puts (s);
 
-    sprintf (s, "%s %s %s  %s",
-             (d & MODE_CV)                ? "cv" : "  ",
-             (d & MODE_CC)                ? "cc" : "  ",
-             (e & MODE_FOLDBACK_EN)       ? "fb" : "  ",
-    /* FIXME:  errors might need to be displayed simultaneously? */
-             (d & MODE_OV)                ? " OVERVOLT!" 
-                   : (d & MODE_OT)        ? " OVERTEMP!"
-                   : (d & MODE_OVERRANGE) ? "OVERRANGE!"
-                   : (d & MODE_DISABLED)  ? " DISABLED!"
-                   : (d & MODE_FOLDBACK)  ? " FOLDBACK!"
-                   : (d & MODE_ERROR)     ? "    ERROR!"
-                   :                        "          ");
+    if (dostatus) {
+        sprintf (s, "%s %s %s  %s",
+                 (d & MODE_CV)                ? "cv" : "  ",
+                 (d & MODE_CC)                ? "cc" : "  ",
+                 (e & MODE_FOLDBACK_EN)       ? "fb" : "  ",
+        /* FIXME:  errors might need to be displayed simultaneously? */
+                 (d & MODE_OV)                ? " OVERVOLT!" 
+                       : (d & MODE_OT)        ? " OVERTEMP!"
+                       : (d & MODE_OVERRANGE) ? "OVERRANGE!"
+                       : (d & MODE_DISABLED)  ? " DISABLED!"
+                       : (d & MODE_FOLDBACK)  ? " FOLDBACK!"
+                       : (d & MODE_ERROR)     ? "    ERROR!"
+                       :                        "          ");
+    } else {
+        sprintf (s, "(c) 2010 Jim Garlick");
+    }
     lcd_goto (0x40);
     lcd_puts (s);
 
 }
 #else
-void
+static void
 update_display (void)
 {
     char s[21];
@@ -151,15 +208,23 @@ update_display (void)
 }
 #endif
 
+static void
+update_controls (void)
+{
+    unsigned char b = PORTB;
+    data[2] = (b >> 1) | 0x87; /* force bit 7 and 3:0 high (inactive) */
+}
+
+
 static void interrupt
 isr (void)
 {
-    int is_address = !HP_DA; /* read it fast - timing is tight! */
+    int is_address = !HP_DA;	/* read DA fast - timing is tight! */
     static unsigned char addr = 0;
     char b;
 
     if (SSPIF) {
-        b = ~SSPBUF;	/* read SSPBUF no matter what (else overflow) */
+        b = ~SSPBUF;		/* read SSPBUF no matter what (else overflow) */
         if (is_address) {
             addr = b;
             if (addr == 0x12) {
@@ -168,7 +233,7 @@ isr (void)
             }
 	} else {
             if (addr == 0x12)
-                TRISC5 = 1;
+                TRISC5 = 1; 	/* let DATA_UP float high when not in use */
             else if ((addr & 0x10))
                 data[addr & 0x0f] = b;
         }
@@ -182,13 +247,13 @@ main(void)
     ADCON1 = 0x06;
 
     TRISA = 0;
-    TRISB = 0;
-    TRISC = 0b01111100; /* RC6:2 are inputs */
+    TRISB = 0b11110000; /* RB7:4 are inputs */
+    TRISC = 0b11111100; /* RC7:2 are inputs */
+    RBPU  = 0;		/* enable pullups on RB7:4 */
 
     lcd_init ();
 
     memset (data, 0xff, sizeof (data));     
-    data[2] = 0b11011111; /* TEST: depress 'display settings' */
 
     while (!HP_PCLR)    /* wait for p/s to come out of reset */
         ;
@@ -210,8 +275,9 @@ main(void)
     GIE = 1;            /* enable global interrupts */
 
     for (;;) {
+	update_controls ();
         update_display ();
-        DelayMs (250);
+        DelayMs (100);
     }
 }
 
