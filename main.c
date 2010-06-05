@@ -1,8 +1,6 @@
 #include <htc.h>
 #include <string.h>
 #include <stdio.h>
-#include "lcd.h"
-#include "delay.h"
 
 #if defined(_16F873A)
 __CONFIG (HS & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
@@ -23,6 +21,8 @@ __CONFIG (HS & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
 #define SW_FOLDBACK	RA5
 #define PORTA_INPUTS	0b00110001
 
+#define LCD_DATA	PORTB
+#define SW_RPG		PORTB
 #define LCD_DATA4	RB0
 #define LCD_DATA5	RB1
 #define LCD_DATA6	RB2
@@ -43,6 +43,30 @@ __CONFIG (HS & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
 #define HP_PCLR		RC6
 #define DEBUG_LED       RC7	/* used for debugging during development */
 #define PORTC_INPUTS	0b01111111 /* N.B. HP_DATAUP is initially tri-state */
+
+/**
+ ** LCD stuff
+ **/
+
+#define	LCD_STROBE()	((LCD_EN = 1),(LCD_EN=0))
+
+/**
+ ** Delay stuff
+ **/
+
+#define	MHZ	*1000L			/* number of kHz in a MHz */
+#define	KHZ	*1			/* number of kHz in a kHz */
+#if	_XTAL_FREQ >= 12MHZ
+#define	DelayUs(x)	{ unsigned char _dcnt; \
+			  _dcnt = (x)*((_XTAL_FREQ)/(12MHZ)); \
+			  while(--_dcnt != 0) \
+				  continue; }
+#else
+#define	DelayUs(x)	{ unsigned char _dcnt; \
+			  _dcnt = (x)/((12MHZ)/(_XTAL_FREQ))|1; \
+			  while(--_dcnt != 0) \
+				  continue; }
+#endif
 
 /**
  ** HP 6038A shift register bit definitions
@@ -94,6 +118,84 @@ static unsigned char addr;
 /* Initial/previous state of RPG control.
  */
 static unsigned char rpg;
+
+static void
+DelayMs(unsigned char cnt)
+{
+#if	_XTAL_FREQ <= 2MHZ
+	do {
+		DelayUs(996);
+	} while(--cnt);
+#endif
+#if    _XTAL_FREQ > 2MHZ	
+	unsigned char	i;
+	do {
+		i = 4;
+		do {
+			DelayUs(250);
+		} while(--i);
+	} while(--cnt);
+#endif
+}
+
+void
+lcd_write(unsigned char c)
+{
+	__delay_us(40);
+	LCD_DATA = (c >> 4) & 0x0f;
+	LCD_STROBE();
+	LCD_DATA = c & 0x0f;
+	LCD_STROBE();
+}
+
+void
+lcd_clear(void)
+{
+	LCD_RS = 0;
+	lcd_write(0x1);
+	__delay_ms(2);
+}
+
+void
+lcd_puts(const char * s)
+{
+	LCD_RS = 1;
+	while(*s)
+		lcd_write(*s++);
+}
+
+void
+lcd_goto(unsigned char pos)
+{
+	LCD_RS = 0;
+	lcd_write(0x80+pos);
+}
+	
+void
+lcd_init()
+{
+	char init_value;
+
+	LCD_RS = 0;
+	LCD_EN = 0;
+	LCD_RW = 0;
+	
+	__delay_ms(15);
+	LCD_DATA = 0x3;
+	LCD_STROBE();
+	__delay_ms(5);
+	LCD_STROBE();
+	__delay_us(200);
+	LCD_STROBE();
+	__delay_us(200);
+	LCD_DATA = 2;		/* select 4 bit mode */
+	LCD_STROBE();
+
+	lcd_write(0x28); 	/* set interface length */
+	lcd_write(0xc); 	/* display on, cursor off, cursor no blink */
+	lcd_clear();		/* clear screen */
+	lcd_write(0x6);		/* set entry mode */
+}
 
 static const char *
 seg7str (unsigned char c)
@@ -170,7 +272,6 @@ update_display (void)
         (d & MODE_LSN) ? '*' : ' ',
         (d & MODE_TLK) ? '*' : ' ',
         (d & MODE_SRQ) ? '*' : ' ');
-                
     sprintf (s, "%-2s %-4s %-4s %7s",
                 (d & MODE_CV) ? "cV" : (d & MODE_CC) ? "cC" : "",
                 (e & MODE_VOLTAGE) ? "adjV" : (e & MODE_CURRENT) ? "adjC" : "",
@@ -255,7 +356,7 @@ isr (void)
      * Quadrature trick: set CONT_RPG_CLOCKW if (old RPG_B xor new RPG_A) == 1.
      */
     if (RBIF) {
-        char nrpg = (PORTB >> 6) & 0x3;
+        char nrpg = (SW_RPG >> 6) & 0x3;
 
 #ifdef RPG_DETENT
 	if (nrpg != RPG_DETENT)
