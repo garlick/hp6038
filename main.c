@@ -8,33 +8,27 @@
 __CONFIG (HS & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
              & WRTEN & DEBUGDIS & UNPROTECT);
 #else
-#error Please configure chip-specific __CONFIG mask
+#error Config bits and other stuff may need attention for non-16F873A chip.
 #endif
-
-/* Define to display 16 register values in hex on the LCD instead
- * of decoded values.
- */
-#undef RAW_DISPLAY
-
 
 /**
  ** PIC parallel port/SPI definitions
  **/
 
-#define __UNUSED1	RA0
+#define SW_LOCAL  	RA0
 #define LCD_EN		RA1
 #define LCD_RW		RA2
 #define LCD_RS		RA3
 #define SW_DISP_SET	RA4
 #define SW_FOLDBACK	RA5
-#define PORTA_INPUTS	0b00110000
+#define PORTA_INPUTS	0b00110001
 
 #define LCD_DATA4	RB0
 #define LCD_DATA5	RB1
 #define LCD_DATA6	RB2
 #define LCD_DATA7	RB3
-#define __UNUSED2  	RB4	/* RBI */
-#define __UNUSED3  	RB5	/* RBI */
+#define __UNUSED1  	RB4	/* RBI */
+#define __UNUSED2  	RB5	/* RBI */
 #define SW_RPG_A	RB6	/* RBI */
 #define SW_RPG_B	RB7	/* RBI */
 #define PORTB_INPUTS	0b11000000
@@ -47,8 +41,8 @@ __CONFIG (HS & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
 #define HP_DATADOWN	RC4	/* SPI SDI */
 #define HP_DATAUP	RC5	/* SPI SDO */
 #define HP_PCLR		RC6
-#define SW_LOCAL        RC7
-#define PORTC_INPUTS	0b11111111 /* N.B. HP_DATAUP is initially tri-state */
+#define DEBUG_LED       RC7	/* used for debugging during development */
+#define PORTC_INPUTS	0b01111111 /* N.B. HP_DATAUP is initially tri-state */
 
 /**
  ** HP 6038A shift register bit definitions
@@ -79,6 +73,12 @@ __CONFIG (HS & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
 #define CONT_DISP_SET	0x20
 #define CONT_FOLDBACK	0x40
 
+/* If your RPG has detents or if you want to reduce its resolution by 4,
+ * define the <B><A> greycode that is emitted when you land on a detent.
+ * Undef this if you don't want it.
+ */
+#define RPG_DETENT	0
+
 /* Software versions of HP shift registers
  * 0x00   mode0   0x08   ds1 (current ones)     0x0c  ds5 (volts ones)
  * 0x01   mode1   0x09   ds2 (current tens)     0x0d  ds6 (volts tens)
@@ -94,9 +94,6 @@ static unsigned char addr;
 /* Initial/previous state of RPG control.
  */
 static unsigned char rpg;
-
-#define RPG_INTERRUPT 0
-#define POLL_CONTROLS 1
 
 static const char *
 seg7str (unsigned char c)
@@ -126,7 +123,7 @@ seg7str (unsigned char c)
 	case 0x55: return "H";
 	case 0xd3: return "L";
 	case 0xff: return " ";
-	/* FIXME: do we need "E" "r" for error display? */
+	/* FIXME: do we need "E" "r" for self-test error display? */
 	default:   return "*";
     }
 }
@@ -138,6 +135,8 @@ seg5str (unsigned char c)
 	case 0xe6: return "+";
 	case 0xef: return "-";
 	case 0xf9: return "1";
+        case (0xef & 0xf9): return "+1";
+        case (0xe6 & 0xf9): return "-1";
 	case 0xff: return " ";
 	default:   return "*";
     }
@@ -147,65 +146,41 @@ static void
 update_display (void)
 {
     char s[21];
+    char tmp1[10], tmp2[10];;
     unsigned char d = ~data[0];
     unsigned char e = ~data[1];
-    char dostatus = 0;
 
-    /* Line 1: +1.000v +1.000a
-     *     or: HP 6038 front panel
-     *     or OVP +1.000v
-     *     or HP-IB channel 05
+    /* Line 1: volts and amps
      */
-    if (data[0xe] == 0xff && data[0xd] == 0xff && data[0xc] == 0xff) {
-        sprintf (s, "HP 6038A front panel");
-
-    } else if (data[0xe] == 0xc3 && data[0xd] == 0x55 && data[0xc] == 0xd3) {
-        sprintf (s, "HP-IB channel %s%s",
-                 seg7str (data[0x9]), seg7str (data[0x8]));
-
-    } else if (data[0x8] == 0xff && data[0x9] == 0xff && data[0xa] == 0xff) {
-        sprintf (s, "OVP %s%s%s%sV",
+    sprintf (tmp1, "%s%s%s%s",
                  seg5str (data[0xf]), seg7str (data[0xe]),
                  seg7str (data[0xd]), seg7str (data[0xc]));
-
-        dostatus = 1;
-    } else {
-        sprintf (s, "%s%s%s%s%c %s%s%s%s%c",
-                 seg5str (data[0xf]), seg7str (data[0xe]),
-                 seg7str (data[0xd]), seg7str (data[0xc]),
-                 (e & MODE_VOLTAGE) ? 'V' : 'v',
+    sprintf (tmp2, "%s%s%s%s",
                  seg5str (data[0xb]), seg7str (data[0xa]),
-                 seg7str (data[0x9]), seg7str (data[0x8]),
-                 (e & MODE_CURRENT) ? 'A' : 'a');
-        dostatus = 1;
-    }
-    if (!strncmp (s, " .", 2))
-        s[0] = '0';
-    while (strlen (s) < 20)
-        strcat (s, " ");
-
+                 seg7str (data[0x9]), seg7str (data[0x8]));
+    sprintf (s, "%-10s%10s", tmp1, tmp2);
     lcd_goto (0);
     lcd_puts (s);
 
-    /* Line 2: cv cc fb  ERROR!
-     *     or: (c) 2010 Jim Garlick
-     * FIXME: we are only displaying one error at a time.
+    /* Line 2: [CC|CV] ADJ-[c|v] [fold] [gpib|error]
+     * FIXME: only one error can be displayed at a time.
      */
-    if (dostatus) {
-        sprintf (s, "%s %s %s  %s",
-                 (d & MODE_CV)                ? "cv" : "  ",
-                 (d & MODE_CC)                ? "cc" : "  ",
-                 (e & MODE_FOLDBACK_EN)       ? "fb" : "  ",
-                 (d & MODE_OV)                ? " OVERVOLT!" 
-                       : (d & MODE_OT)        ? " OVERTEMP!"
-                       : (d & MODE_OVERRANGE) ? "OVERRANGE!"
-                       : (d & MODE_DISABLED)  ? " DISABLED!"
-                       : (d & MODE_FOLDBACK)  ? " FOLDBACK!"
-                       : (d & MODE_ERROR)     ? "    ERROR!"
-                       :                        "          ");
-    } else {
-        sprintf (s, "(c) 2010 Jim Garlick");
-    }
+    sprintf (tmp1, "%c%c%c%c",
+        (d & MODE_RMT) ? '*' : ' ',
+        (d & MODE_LSN) ? '*' : ' ',
+        (d & MODE_TLK) ? '*' : ' ',
+        (d & MODE_SRQ) ? '*' : ' ');
+                
+    sprintf (s, "%-2s %-4s %-4s %7s",
+                (d & MODE_CV) ? "cV" : (d & MODE_CC) ? "cC" : "",
+                (e & MODE_VOLTAGE) ? "adjV" : (e & MODE_CURRENT) ? "adjC" : "",
+	        (e & MODE_FOLDBACK_EN) ? "fold" : "",
+	                (d & MODE_OV)        ? "OVERVLT" 
+	              : (d & MODE_OT)        ? "OVERTMP"
+	              : (d & MODE_OVERRANGE) ? "OVERRNG"
+	              : (d & MODE_DISABLED)  ? "DISABL"
+                      : (d & MODE_FOLDBACK)  ? "FOLDBCK"
+                      : (d & MODE_ERROR)     ? "ERROR" : tmp1);
     lcd_goto (0x40);
     lcd_puts (s);
 
@@ -275,23 +250,26 @@ isr (void)
         SSPIF = 0;
     }
 
-#if RPG_INTERRUPT
     /* Handle interrupt on RB7:6 (RPG) state change.
      * Goal is to set CONT_RPG_ROTAT flag if turned since last read.
      * Quadrature trick: set CONT_RPG_CLOCKW if (old RPG_B xor new RPG_A) == 1.
      */
     if (RBIF) {
-        char nrpg = PORTB | 0x3f;
+        char nrpg = (PORTB >> 6) & 0x3;
 
+#ifdef RPG_DETENT
+	if (nrpg != RPG_DETENT)
+            goto skip_notdetent;
+#endif
         data[2] &= ~CONT_RPG_ROTAT;
-        if (((rpg >> 7) & 1)  ^ ((nrpg >> 6) & 1) == 1)
+        if (((rpg >> 1) ^ nrpg) & 1 == 1)
             data[2] &= ~CONT_RPG_CLOCKW;
         else
             data[2] |= CONT_RPG_CLOCKW;
+skip_notdetent:
         rpg = nrpg;
         RBIF = 0;
     }
-#endif
 }
 
 void
@@ -308,7 +286,7 @@ main(void)
 
     memset (data, 0xff, sizeof (data));     
     addr = 0;
-    rpg = PORTB | 0x3f;	/* initialize RPG state (SW_RPG_B | SW_RPG_A) */
+    rpg = (PORTB >> 6) & 0x3; /* initialize RPG state */
 
     while (!HP_PCLR)    /* wait for HP to come out of reset */
         ;
@@ -326,17 +304,13 @@ main(void)
     RBIF = 0;           /* clear PORTB state change interrupt flag */
     SSPIE = 1;          /* enable SSP interrupt */
     PEIE = 1;           /* enable peripheral interupts */
-#if RPG_INTERRUPT
     RBIE = 1;           /* enable interrupt on PORTB state change */
-#endif
     GIE = 1;            /* enable global interrupts */
 
     for (;;) {
-#if POLL_CONTROLS
 	update_controls ();
-#endif
         update_display ();
-        DelayMs (100);
+        DelayMs (10);
     }
 }
 
