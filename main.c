@@ -21,31 +21,34 @@ __CONFIG (HS & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
  ** PIC parallel port/SPI definitions
  **/
 
-/* RA0 unused */
+#define __UNUSED1	RA0
 #define LCD_EN		RA1
 #define LCD_RW		RA2
 #define LCD_RS		RA3
-/* RA4 unused */
-/* RA5 unused */
+#define SW_DISP_SET	RA4
+#define SW_FOLDBACK	RA5
+#define PORTA_INPUTS	0b00110000
 
 #define LCD_DATA4	RB0
 #define LCD_DATA5	RB1
 #define LCD_DATA6	RB2
 #define LCD_DATA7	RB3
-#define SW_VOLT_CUR	RB4
-#define SW_DISP_OVP	RB5
-#define SW_DISP_SET	RB6
-#define SW_FOLDBACK	RB7
+#define __UNUSED2  	RB4	/* RBI */
+#define __UNUSED3  	RB5	/* RBI */
+#define SW_RPG_A	RB6	/* RBI */
+#define SW_RPG_B	RB7	/* RBI */
+#define PORTB_INPUTS	0b11000000
+#define PORTB_PULLUP	0	/* pullups enabled for RPG */
 
-/* RC0 unused */
-/* RC1 unused */
-#define HP_DA	    	RC2	/*           pin 8 (L=address, H=data) */
-#define HP_IOCLOCK	RC3	/* (SPI SCK) pin 5 */
-#define HP_DATADOWN	RC4	/* (SPI SDI) pin 2 (ps->pic) */
-#define HP_DATAUP	RC5	/* (SPI SDO) pin 11 (pic->ps) */
-#define HP_PCLR		RC6	/*           pin 16 (active low) */
-
+#define SW_VOLT_CUR 	RC0
+#define SW_DISP_OVP	RC1
+#define HP_DA	    	RC2
+#define HP_IOCLOCK	RC3	/* SPI SCK */
+#define HP_DATADOWN	RC4	/* SPI SDI */
+#define HP_DATAUP	RC5	/* SPI SDO */
+#define HP_PCLR		RC6
 #define SW_LOCAL        RC7
+#define PORTC_INPUTS	0b11111111 /* N.B. HP_DATAUP is initially tri-state */
 
 /**
  ** HP 6038A shift register bit definitions
@@ -84,7 +87,17 @@ __CONFIG (HS & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
  */
 static unsigned char data[16];
 
-#ifndef RAW_DISPLAY
+/* Address used to index data[].
+ */
+static unsigned char addr;
+
+/* Initial/previous state of RPG control.
+ */
+static unsigned char rpg;
+
+#define RPG_INTERRUPT 0
+#define POLL_CONTROLS 1
+
 static const char *
 seg7str (unsigned char c)
 {
@@ -113,6 +126,7 @@ seg7str (unsigned char c)
 	case 0x55: return "H";
 	case 0xd3: return "L";
 	case 0xff: return " ";
+	/* FIXME: do we need "E" "r" for error display? */
 	default:   return "*";
     }
 }
@@ -137,6 +151,11 @@ update_display (void)
     unsigned char e = ~data[1];
     char dostatus = 0;
 
+    /* Line 1: +1.000v +1.000a
+     *     or: HP 6038 front panel
+     *     or OVP +1.000v
+     *     or HP-IB channel 05
+     */
     if (data[0xe] == 0xff && data[0xd] == 0xff && data[0xc] == 0xff) {
         sprintf (s, "HP 6038A front panel");
 
@@ -168,12 +187,15 @@ update_display (void)
     lcd_goto (0);
     lcd_puts (s);
 
+    /* Line 2: cv cc fb  ERROR!
+     *     or: (c) 2010 Jim Garlick
+     * FIXME: we are only displaying one error at a time.
+     */
     if (dostatus) {
         sprintf (s, "%s %s %s  %s",
                  (d & MODE_CV)                ? "cv" : "  ",
                  (d & MODE_CC)                ? "cc" : "  ",
                  (e & MODE_FOLDBACK_EN)       ? "fb" : "  ",
-        /* FIXME:  errors might need to be displayed simultaneously? */
                  (d & MODE_OV)                ? " OVERVOLT!" 
                        : (d & MODE_OT)        ? " OVERTEMP!"
                        : (d & MODE_OVERRANGE) ? "OVERRANGE!"
@@ -188,57 +210,88 @@ update_display (void)
     lcd_puts (s);
 
 }
-#else
-static void
-update_display (void)
-{
-    char s[21];
 
-    sprintf (s, "%.2x%.2x %.2x%.2x %.2x%.2x %.2x%.2x",
-        data[0x0], data[0x1], data[0x2], data[0x3],
-        data[0x4], data[0x5], data[0x6], data[0x7]);
-    lcd_goto (0);
-    lcd_puts (s);
-
-    sprintf (s, "%.2x%.2x %.2x%.2x %.2x%.2x %.2x%.2x",
-        data[0x8], data[0x9], data[0xa], data[0xb],
-        data[0xc], data[0xd], data[0xe], data[0xf]);
-    lcd_goto (0x40);
-    lcd_puts (s);
-}
-#endif
-
+/* According to service manual, HP polls RPG every 1ms, controls every 10ms.
+ * FIXME: call this from a ~5ms  timer interrupt?
+ */
 static void
 update_controls (void)
 {
-    unsigned char b = PORTB;
-    data[2] = (b >> 1) | 0x87; /* force bit 7 and 3:0 high (inactive) */
-}
+    if (SW_LOCAL == 0)
+        data[2] &= ~CONT_LOCAL;
+    else
+        data[2] |= CONT_LOCAL;
 
+    if (SW_VOLT_CUR == 0)
+        data[2] &= ~CONT_VOLT_CUR;
+    else
+        data[2] |= CONT_VOLT_CUR;
+
+    if (SW_DISP_OVP == 0)
+        data[2] &= ~CONT_DISP_OVP;
+    else
+        data[2] |= CONT_DISP_OVP;
+
+    if (SW_DISP_SET == 0)
+        data[2] &= ~CONT_DISP_SET;
+    else
+        data[2] |= CONT_DISP_SET;
+
+    if (SW_FOLDBACK == 0)
+        data[2] &= ~CONT_FOLDBACK;
+    else
+        data[2] |= CONT_FOLDBACK;
+}
 
 static void interrupt
 isr (void)
 {
-    int is_address = !HP_DA;	/* read DA fast - timing is tight! */
-    static unsigned char addr = 0;
-    char b;
+    unsigned char hp_da = HP_DA; /* cache this - timing is tight! */
 
+    /* Handle SPI interrupt.
+     * First comes address with HP_DA=L, the data with HP_DA=H.
+     * With SPI each cycle is both read and write, however the HP wants
+     * DATA_UP tri-state when it is not explicitly reading.  Addr=0x12
+     * signifies a read.  When we see that, load SSPBUF and un-tri-state
+     * DATA_UP.  After read is over, re-tri-state DATA_UP.
+     * FIXME: addr=0x02 appears on the wire - why?  Ignore for now.
+     */
     if (SSPIF) {
-        b = ~SSPBUF;		/* read SSPBUF no matter what (else overflow) */
-        if (is_address) {
+        char b = ~SSPBUF;    /* read SSPBUF no matter what (else overflow) */
+
+        if (!hp_da) {        /* address */
             addr = b;
             if (addr == 0x12) {
                 SSPBUF = data[2];
 	        TRISC5 = 0;
+                data[2] |= CONT_RPG_ROTAT;
             }
-	} else {
+	} else {             /* data */
             if (addr == 0x12)
-                TRISC5 = 1; 	/* let DATA_UP float high when not in use */
+                TRISC5 = 1;
             else if ((addr & 0x10))
                 data[addr & 0x0f] = b;
         }
         SSPIF = 0;
     }
+
+#if RPG_INTERRUPT
+    /* Handle interrupt on RB7:6 (RPG) state change.
+     * Goal is to set CONT_RPG_ROTAT flag if turned since last read.
+     * Quadrature trick: set CONT_RPG_CLOCKW if (old RPG_B xor new RPG_A) == 1.
+     */
+    if (RBIF) {
+        char nrpg = PORTB | 0x3f;
+
+        data[2] &= ~CONT_RPG_ROTAT;
+        if (((rpg >> 7) & 1)  ^ ((nrpg >> 6) & 1) == 1)
+            data[2] &= ~CONT_RPG_CLOCKW;
+        else
+            data[2] |= CONT_RPG_CLOCKW;
+        rpg = nrpg;
+        RBIF = 0;
+    }
+#endif
 }
 
 void
@@ -246,36 +299,42 @@ main(void)
 {
     ADCON1 = 0x06;
 
-    TRISA = 0;
-    TRISB = 0b11110000; /* RB7:4 are inputs */
-    TRISC = 0b11111100; /* RC7:2 are inputs */
-    RBPU  = 0;		/* enable pullups on RB7:4 */
+    TRISA = PORTA_INPUTS;
+    TRISB = PORTB_INPUTS;
+    TRISC = PORTC_INPUTS;
+    RBPU  = PORTB_PULLUP;
 
     lcd_init ();
 
     memset (data, 0xff, sizeof (data));     
+    addr = 0;
+    rpg = PORTB | 0x3f;	/* initialize RPG state (SW_RPG_B | SW_RPG_A) */
 
-    while (!HP_PCLR)    /* wait for p/s to come out of reset */
+    while (!HP_PCLR)    /* wait for HP to come out of reset */
         ;
 
     /* SSPCON */
     SSPEN = 0;          /* disable SSP (clears shift reg) */
-    SSPM3=0; SSPM2=1; SSPM1=0; SSPM0 = 1; /* select slave mode w/o SS */
+    SSPM3=0; SSPM2=1; SSPM1=0; SSPM0 = 1; /* select SPI slave mode w/o SS */
     CKP = 1;            /* clock polarity: idle state is H */
-
     /* SSPSTAT */
     CKE = 0;            /* data transmitted on the rising edge of SCK */
-
     SSPEN = 1;          /* enable SSP */
 
     /* Interrupts */
     SSPIF = 0;          /* clear SSP interrupt flag */
+    RBIF = 0;           /* clear PORTB state change interrupt flag */
     SSPIE = 1;          /* enable SSP interrupt */
     PEIE = 1;           /* enable peripheral interupts */
+#if RPG_INTERRUPT
+    RBIE = 1;           /* enable interrupt on PORTB state change */
+#endif
     GIE = 1;            /* enable global interrupts */
 
     for (;;) {
+#if POLL_CONTROLS
 	update_controls ();
+#endif
         update_display ();
         DelayMs (100);
     }
