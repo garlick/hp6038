@@ -44,29 +44,6 @@ __CONFIG (HS & WDTDIS & PWRTEN & BORDIS & LVPDIS & DUNPROT
 #define DEBUG_LED       RC7	/* used for debugging during development */
 #define PORTC_INPUTS	0b01111111 /* N.B. HP_DATAUP is initially tri-state */
 
-/**
- ** LCD stuff
- **/
-
-#define	LCD_STROBE()	((LCD_EN = 1),(LCD_EN=0))
-
-/**
- ** Delay stuff
- **/
-
-#define	MHZ	*1000L			/* number of kHz in a MHz */
-#define	KHZ	*1			/* number of kHz in a kHz */
-#if	_XTAL_FREQ >= 12MHZ
-#define	DelayUs(x)	{ unsigned char _dcnt; \
-			  _dcnt = (x)*((_XTAL_FREQ)/(12MHZ)); \
-			  while(--_dcnt != 0) \
-				  continue; }
-#else
-#define	DelayUs(x)	{ unsigned char _dcnt; \
-			  _dcnt = (x)/((12MHZ)/(_XTAL_FREQ))|1; \
-			  while(--_dcnt != 0) \
-				  continue; }
-#endif
 
 /**
  ** HP 6038A shift register bit definitions
@@ -119,24 +96,8 @@ static unsigned char addr;
  */
 static unsigned char rpg;
 
-static void
-DelayMs(unsigned char cnt)
-{
-#if	_XTAL_FREQ <= 2MHZ
-	do {
-		DelayUs(996);
-	} while(--cnt);
-#endif
-#if    _XTAL_FREQ > 2MHZ	
-	unsigned char	i;
-	do {
-		i = 4;
-		do {
-			DelayUs(250);
-		} while(--i);
-	} while(--cnt);
-#endif
-}
+
+#define	LCD_STROBE()	((LCD_EN = 1),(LCD_EN=0))
 
 void
 lcd_write(unsigned char c)
@@ -174,8 +135,6 @@ lcd_goto(unsigned char pos)
 void
 lcd_init()
 {
-	char init_value;
-
 	LCD_RS = 0;
 	LCD_EN = 0;
 	LCD_RW = 0;
@@ -411,7 +370,7 @@ main(void)
     for (;;) {
 	update_controls ();
         update_display ();
-        DelayMs (10);
+	__delay_ms(10);
     }
 }
 
