@@ -102,12 +102,12 @@ main(int argc, char *argv[])
     printf ("/* 7 segment displays */\n");
     for (i = 0; i < (sizeof(tab7)/sizeof(ledmap_t)); i++) {
         printf ("case 0x%-2.2x: return \"%s\";\n",
-		(unsigned char)~encode7 (tab7[i].segstr), tab7[i].ch);
+        (unsigned char)~encode7 (tab7[i].segstr), tab7[i].ch);
     }
     printf ("/* 5 segment displays */\n");
     for (i = 0; i < (sizeof(tab5)/sizeof(ledmap_t)); i++) {
         printf ("case 0x%-2.2x: return \"%s\";\n",
-		(unsigned char)~encode5 (tab5[i].segstr), tab5[i].ch);
+        (unsigned char)~encode5 (tab5[i].segstr), tab5[i].ch);
     }
 }
 
