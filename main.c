@@ -187,6 +187,7 @@ seg7str (unsigned char c)
         case 0xd3: return "L";
         case 0xd2: return "E";
         case 0xf6: return "r";
+        case 0xff: return " ";
         default:   return "*";
     }
 }
