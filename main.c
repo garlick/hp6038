@@ -1,3 +1,26 @@
+/*****************************************************************************\
+ *  main.c - firmware for HP6038 front panel replacement
+ *****************************************************************************
+ *  Copyright (C) 2010 Jim Garlick
+ *  
+ *  This file is part of Scrub, a program for erasing disks.
+ *  For details, see <http://www.llnl.gov/linux/scrub/>.
+ *  
+ *  Scrub is free software; you can redistribute it and/or modify it under
+ *  the terms of the GNU General Public License as published by the Free
+ *  Software Foundation; either version 2 of the License, or (at your option)
+ *  any later version.
+ *  
+ *  Scrub is distributed in the hope that it will be useful, but WITHOUT ANY
+ *  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ *  FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ *  details.
+ *  
+ *  You should have received a copy of the GNU General Public License along
+ *  with Scrub; if not, write to the Free Software Foundation, Inc.,
+ *  59 Temple Place, Suite 330, Boston, MA  02111-1307  USA.
+\*****************************************************************************/
+    
 #include <htc.h>
 #include <string.h>
 #include <stdio.h>
