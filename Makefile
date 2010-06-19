@@ -2,7 +2,7 @@ PICP_TTY=/dev/ttyUSB0
 CHIP=16F873A
 #CHIP=16F77
 #CHIP=16F72
-FREQ=24000000
+FREQ=20000000
 SRCS=main.c
 
 all: main.hex genledmap

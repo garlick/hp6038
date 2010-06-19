@@ -149,10 +149,10 @@ lcd_init()
     LCD_DATA = 2;        /* select 4 bit mode */
     LCD_STROBE();
 
-    lcd_write(0x28);     /* set interface length */
+    lcd_write(0x28);    /* set interface length */
     lcd_write(0xc);     /* display on, cursor off, cursor no blink */
     lcd_clear();        /* clear screen */
-    lcd_write(0x6);        /* set entry mode */
+    lcd_write(0x6);     /* set entry mode */
 }
 
 static const char *
@@ -237,7 +237,7 @@ update_display (void)
                 (d & MODE_SRQ) ? '*' : ' ');
     sprintf (s, "%-2s %-4s %-4s %7s",
                 (d & MODE_CV) ? "cV" : (d & MODE_CC) ? "cC" : "",
-                (e & MODE_VOLTAGE) ? "adjV" : (e & MODE_CURRENT) ? "adjC" : "",
+                (e & MODE_VOLTAGE) ? "volt" : (e & MODE_CURRENT) ? "cur" : "",
                 (e & MODE_FOLDBACK_EN) ? "fold" : "",
                 (d & MODE_OV)        ? "OVERVLT" 
               : (d & MODE_OT)        ? "OVERTMP"
