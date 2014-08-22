@@ -1,0 +1,69 @@
+#summary HP 6038A Front Panel Prototypes
+
+== TTL Prototype ==
+
+This was an attempt at recreating the HP 6038A front panel from
+the schematic in the service manual.
+
+The RPG encoder was a low cost
+[http://www.grayhill.com/catalog/Opt_Encoder_62P.pdf Grayhill 62P series],
+16 detents per revolution, with a built in pushbutton switch.
+The pushbutton was used to select between voltage and current adjust.
+Although it worked, this RPG did not have sufficient resolution and it
+took many turns to make adjustments.
+
+The service manual schematic had the LED segments
+assigned to the wrong shift register bits.
+The correct wiring was deduced through trial and error and is
+presented in the [design Design] wiki page.
+
+Due to space on the proto board, the 5 segment LED for AMPS was omitted.
+
+The board attached to the power supply via ribbon cable to the GPIB board,
+routed out through the back of the unit.
+
+http://hp6038frontpanel.googlecode.com/svn/wiki/P1010560.PNG  
+
+http://hp6038frontpanel.googlecode.com/svn/wiki/P1010561.PNG
+
+In retrospect, the board layout was attrocious and a front panel connected
+to the main power supply unit via ribbon cable was unusable.
+The finished product found a nice home in a garage cupboard.
+A better plan would have been to invest in a protoboard that could be
+cut to fit inside the case instead of using available scrap.
+
+== PIC Prototype ==
+
+It seemed like a fun challenge to reduce the above to a single chip
+PIC design that could be built into the power supply case, and
+be constructed with much less effort.
+
+The PIC includes an SPI peripheral that seemed to map well to
+HP's shift register design for the front panel.  Further, it includes
+an _interrupt on change_ feature for four I/O port pins that seemed useful
+for interfacing to the RPG.  Interfacing PIC's to LCD's and pushbuttons
+is straightforward.
+
+First it was necessary to build a prototype to see if it could work,
+and to get the firmware developed.  This prototype was based on:
+
+ * PIC MPLAB ICD demo board (already had)
+ * [http://ww1.microchip.com/downloads/en/DeviceDoc/39582b.pdf 16F873A PIC]
+ * scrap protoboard with five pushbutton switches and pullups on it
+ * [http://www.avagotech.com/docs/5988-5851EN Avago HRPC-AD32] RPG with 32 detents per revolution
+ * [http://www.winstar.com.tw/products_detail_ov.php?ProID=32 Winstar WH2002A] 2x20 LCD display ([http://ouwehand.net/~peter/lcd/lcd.shtml Hitachi HD44780] compatible).
+
+Added to the MPLAB board were two ribbon connectors wired in parallel so
+the TTL front panel could be used in parallel (with the PIC's DATA_UP
+line in tri-state) for debugging the receive/LCD portion of the firwmare.
+The MPLAB board was set up to draw power from the HP ribbon cable.
+
+http://hp6038frontpanel.googlecode.com/svn/wiki/P1010557.PNG
+
+== Final Prototype ==
+
+This is the final prototype, built into the HP 6038A.
+
+http://hp6038frontpanel.googlecode.com/svn/wiki/P1010606_small.PNG
+
+http://hp6038frontpanel.googlecode.com/svn/wiki/P1010608_small.PNG

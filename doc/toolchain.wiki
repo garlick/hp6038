@@ -1,0 +1,29 @@
+#summary Tool Chain
+
+== C Compiler ==
+
+The project is compiled down to Intel hex using
+[http://www.microchip.com/stellent/idcplg?IdcService=SS_GET_PAGE&nodeId=1406&dDocName=en542849 HI-TECH C Compiler for PIC10/12/16 MCUs] on Linux.
+The Lite version is a fully functional but non-optimized free download.
+
+== Programmer ==
+
+The hex object is passed to the Warp 13a programmer
+attached to a USB to RS-232 converter using
+[http://home.pacbell.net/theposts/picmicro/ picp] on Linux.
+
+http://hp6038frontpanel.googlecode.com/svn/wiki/P1010555.PNG
+
+== To build ==
+
+Download the firmware release tarball and do the following.  If you don't
+plan to recompile, you don't need to install picc as a compiled
+executable is included in the tarball.
+
+After you extract the tarball, examine the Makefile and edit for your
+PIC part, clock rate, and pcip serial port, then with pic programmer live
+and part in the programmer socket:
+
+ make pgm
+
+Transplant the chip into your wired board and you're good to go!
