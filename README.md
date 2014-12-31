@@ -5,15 +5,6 @@ gets a homebrew front panel for bench use:
 
 ![](https://github.com/garlick/hp6038/blob/master/doc/P1010598_small.PNG)
 
-while the original looks like this:
-
-![](https://github.com/garlick/hp6038/blob/master/doc/hp6033a.png)
-
-A schematic of the original TTL front panel is available in the
-[HP6033A/38A service manual](http://www.home.agilent.com/agilent/redirector.jspx?action=ref&cname=AGILENT_EDITORIAL&ckey=1000000382-1%3Aepsg%3Aman&lc=eng&cc=US&nfr=-35691.384539), page 99.
-
-While that of our replacement panel is here:
-
 ![](https://github.com/garlick/hp6038/blob/master/doc/schematic.png)
 
 The heart of the replacement front panel is the
@@ -23,6 +14,9 @@ of SPI.  The PIC emulates a set of addressable shift registers that
 correspond to the state of the input/output devices.
 The protocol used between front panel and GPIB board was
 inferred from the schematic and a little prodding with a scope.
+
+A schematic of the original TTL front panel is available in the
+[HP6033A/38A service manual](http://www.home.agilent.com/agilent/redirector.jspx?action=ref&cname=AGILENT_EDITORIAL&ckey=1000000382-1%3Aepsg%3Aman&lc=eng&cc=US&nfr=-35691.384539), page 99.
 
 ### Read Cycle
 
@@ -81,13 +75,13 @@ The front panel obtains power from the GPIB board.
 
 | pin            | function       |description               |
 |----------------|----------------|--------------------------|
-| 1,4,7,10,15    | +5V            |                          |
-| 3,6,9,12,13,14 | GND            |                          |
-| 2              | HP_DATADOWN    | serial I/O to front panel|
-| 5              | HP_IOCLOCK     | L=data valid             |
-| 8              | HP_DA          | L=address, H=data        |
-| 11             | HP_DATAUP      | serial I/O from front panel|
-| 16             | HP_PCLR        | L=clear shift registers  |
+| 1,4,7,10,15    | `+5V`          |                          |
+| 3,6,9,12,13,14 | `GND`          |                          |
+| 2              | `HP_DATADOWN`  | serial I/O to front panel|
+| 5              | `HP_IOCLOCK`   | L=data valid             |
+| 8              | `HP_DA`        | L=address, H=data        |
+| 11             | `HP_DATAUP`    | serial I/O from front panel|
+| 16             | `HP_PCLR`      | L=clear shift registers  |
 
 ![](https://github.com/garlick/hp6038/blob/master/doc/ribbon.png)
 
