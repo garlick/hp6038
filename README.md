@@ -52,29 +52,27 @@ in high-impedance mode afterwards.
 
 As shown in the scope traces on the [protocol Protocol] wiki page,
 the HP drives `SCK` at a half period of about 1 microsecond.
-Call this `T<sub>sck</sub> / 2`.
+Call this T<sub>sck</sub> / 2.
 
 The PIC specification requires that:
 
-T<sub>sck</sub>/2 >= T<sub>cy</sub> + 20 ns
+> T<sub>sck</sub>/2 >= T<sub>cy</sub> + 20 ns
 
 Since T<sub>cy</sub> = 4/F<sub>osc</sub>, an equivalent statement is:
 
-T<sub>sck</sub>/2 >= 4/F<sub>osc</sub> + 20 ns
+> T<sub>sck</sub>/2 >= 4/F<sub>osc</sub> + 20 ns
 
 Substiting 1 microsecond (1000 ns) for Tsck/2:
 
-980 ns >= 4/F<sub>osc</sub>
-
-F<sub>osc</sub> >= 4 / (9.80 x 10<sup>-7</sup> s)
-
-F<sub>osc</sub> >= 4.08 x 10<sup>6</sup> Hz
+> 980 ns >= 4/F<sub>osc</sub>
+> F<sub>osc</sub> >= 4 / (9.80 x 10<sup>-7</sup> s)
+> F<sub>osc</sub> >= 4.08 x 10<sup>6</sup> Hz
 
 Thus to avoid going below the minimum T<sub>sck</sub>/2, the minimum 
 F<sub>osc</sub> is 4.08 MHz.
 
-In addition the HP_DA line must be sampled within about 5 microseconds
-after the last bit of a byte is shifted in by SCK.  This is perhaps an even
+In addition the `HP_DA` line must be sampled within about 5 microseconds
+after the last bit of a byte is shifted in by `SCK`.  This is perhaps an even
 more demanding requirement since it requires the PIC to take an interrupt
 from the MSSP, save context, etc., and execute the interrupt
 service routine in time to sample that line.  I did not study this requirement
@@ -87,7 +85,7 @@ The LCD employed in this project uses a
 controller chip.  It is configured in 4 byte data mode so only 7 PIC I/O
 pins are consumed by the LCD.
 
-A 1K resistor is attached between pin 3 (contrast) and pin 1 (GND) to set
+A 1K resistor is attached between pin 3 `contrast` and pin 1 `GND` to set
 the display contrast.  The value was determined experimentally by attaching
 a potentiometer, adjusting the display, measuring the value and substituting
 a fixed resistance.
@@ -119,7 +117,7 @@ The rotary pulse generator (RPG) or
 [rotary encoder](http://en.wikipedia.org/wiki/Rotary_encoder)
 is a digital rotary input device with quadrature output that is used
 in the HP 6038A to adjust voltage and current.  It is connected to PIC
-inputs RB6 and RB7 which are configured to interrupt
+inputs `RB6` and `RB7` which are configured to interrupt
 whenever their state changes.  Two bits are set in the interrupt service
 routine, one indicating that the RPG changed, and another indicating its
 direction of rotation (based on the previous 2 bit code).  Each time these
