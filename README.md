@@ -10,11 +10,7 @@ while the original looks like this:
 ![](https://github.com/garlick/hp6038/blob/master/doc/hp6033a.png)
 
 A schematic of the original TTL front panel is available in the
-[HP6033A/38A service manual](http://www.home.agilent.com/agilent/redirector.jspx?action=ref&cname=AGILENT_EDITORIAL&ckey=1000000382-1%3Aepsg%3Aman&lc=eng&cc=US&nfr=-35691.384539), page 99.  A long while ago I wire wrapped this from
-the schematic, but the power supply with detached front panel was not very
-usable as a bench instrument:
-
-![](https://github.com/garlick/hp6038/blob/master/doc/P1010608_small.PNG)
+[HP6033A/38A service manual](http://www.home.agilent.com/agilent/redirector.jspx?action=ref&cname=AGILENT_EDITORIAL&ckey=1000000382-1%3Aepsg%3Aman&lc=eng&cc=US&nfr=-35691.384539), page 99.
 
 The heart of the replacement front panel is the
 [PIC 16F873A](http://www.microchip.com/wwwproducts/Devices.aspx?dDocName=en010236). In a nutshell, the PIC interfaces with the various input/output devices
@@ -215,6 +211,9 @@ Five normally open pushbuttons are connected to five inputs on the PIC.
 the switches are open.  The inputs are grounded when the switches are closed.
 
 ### Chassis Mounting
+
+![](https://github.com/garlick/hp6038/blob/master/doc/P1010606_small.PNG)
+![](https://github.com/garlick/hp6038/blob/master/doc/P1010608_small.PNG)
 
 The HP6038A has an inner and an outer front panel, both alumininum.
 The inner panel is drilled for the front panel option but the outer panel
