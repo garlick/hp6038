@@ -62,10 +62,12 @@ Since T<sub>cy</sub> = 4/F<sub>osc</sub>, an equivalent statement is:
 
 > T<sub>sck</sub>/2 >= 4/F<sub>osc</sub> + 20 ns
 
-Substiting 1 microsecond (1000 ns) for Tsck/2:
+Substituting 1 microsecond (1000 ns) for Tsck/2:
 
 > 980 ns >= 4/F<sub>osc</sub>
+
 > F<sub>osc</sub> >= 4 / (9.80 x 10<sup>-7</sup> s)
+
 > F<sub>osc</sub> >= 4.08 x 10<sup>6</sup> Hz
 
 Thus to avoid going below the minimum T<sub>sck</sub>/2, the minimum 
