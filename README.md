@@ -12,6 +12,10 @@ while the original looks like this:
 A schematic of the original TTL front panel is available in the
 [HP6033A/38A service manual](http://www.home.agilent.com/agilent/redirector.jspx?action=ref&cname=AGILENT_EDITORIAL&ckey=1000000382-1%3Aepsg%3Aman&lc=eng&cc=US&nfr=-35691.384539), page 99.
 
+While that of our replacement panel is here:
+
+![](https://github.com/garlick/hp6038/blob/master/doc/schematic.png)
+
 The heart of the replacement front panel is the
 [PIC 16F873A](http://www.microchip.com/wwwproducts/Devices.aspx?dDocName=en010236). In a nutshell, the PIC interfaces with the various input/output devices
 on the front panel, and communicates with the GPIB board using a variant
@@ -71,8 +75,6 @@ Here the data is 0xfd.  The single bit that is off corresponds to the
 illuminated _current_ indicator (bit 1 of U10).
 
 ### GPIB Board Interface
-
-![](https://github.com/garlick/hp6038/blob/master/doc/schematic.png)
 
 The front panel attaches to the GPIB board via a 16-pin ribbon cable.
 The front panel obtains power from the GPIB board.
