@@ -26,33 +26,33 @@ The front panel obtains power from the GPIB board.
 | 11             | HP_DATAUP      | serial I/O from front panel|
 | 16             | HP_PCLR        | L=clear shift registers  |
 
-![](https://github/com/garlick/hp6038/blob/master/doc/ribbon.png)
+![](https://github.com/garlick/hp6038/blob/master/doc/ribbon.png)
 
 The handshake employed by the HP
 to move serial data into shift registers is similar to SPI except for the
-additional HP_DA line to designate whether the byte being transferred is
-address or data, and the fact that the HP_DATAUP line must be in a high
+additional `HP_DA` line to designate whether the byte being transferred is
+address or data, and the fact that the `HP_DATAUP` line must be in a high
 impedance state when the GPIB board has not addressed it for a read.
 
 The PIC is programmed to use its MSSP module in a three-pin slave SPI mode
-(SCK, SDI, and SDO), and to generate an interrupt when a character is received.
-SDO is initially programmed as a parallel input to get it into the high
+(`SCK`, `SDI`, and `SDO`), and to generate an interrupt when a character is received.
+`SDO` is initially programmed as a parallel input to get it into the high
 impedance state.
 
-Upon interrupt, the state of HP_DA is sampled to determine whether
+Upon interrupt, the state of `HP_DA` is sampled to determine whether
 an address or data byte is being read.  If address, the value is stored,
 and if it addresses a read register (0x12 - there is only one), the
-register contents are placed in SSPBUF and SDO is configured as an output.
+register contents are placed in `SSPBUF` and `SDO` is configured as an output.
 
-When a data byte is read on HP_DATADOWN (address != 0x12), the value is stored
+When a data byte is read on `HP_DATADOWN` (address != 0x12), the value is stored
 in the addressed register.
 
-When a data byte is written on HP_DATAUP (address == 0x12), SDO is configured
+When a data byte is written on `HP_DATAUP` (address == 0x12), `SDO` is configured
 in high-impedance mode afterwards.
 
 As shown in the scope traces on the [protocol Protocol] wiki page,
-the HP drives SCK at a half period of about 1 microsecond.
-Call this T<sub>sck</sub> / 2.
+the HP drives `SCK` at a half period of about 1 microsecond.
+Call this `T<sub>sck</sub> / 2`.
 
 The PIC specification requires that:
 
