@@ -1,33 +1,35 @@
-#summary HP 6038A Front Panel Replacement Hardware Design
+HP 6038A Front Panel Replacement Hardware
+=========================================
 
 A schematic of the original TTL front panel is available in the
-[http://www.home.agilent.com/agilent/redirector.jspx?action=ref&cname=AGILENT_EDITORIAL&ckey=1000000382-1%3Aepsg%3Aman&lc=eng&cc=US&nfr=-35691.384539 HP6033A/38A service manual], page 99.
+(http://www.home.agilent.com/agilent/redirector.jspx?action=ref&cname=AGILENT_EDITORIAL&ckey=1000000382-1%3Aepsg%3Aman&lc=eng&cc=US&nfr=-35691.384539)[HP6033A/38A service manual], page 99.
 
 The heart of the replacement front panel is the
-[http://www.microchip.com/wwwproducts/Devices.aspx?dDocName=en010236 PIC 16F873A]. In a nutshell, the PIC interfaces with the various input/output devices
+[PIC 16F873A](http://www.microchip.com/wwwproducts/Devices.aspx?dDocName=en010236). In a nutshell, the PIC interfaces with the various input/output devices
 on the front panel, and communicates with the GPIB board using a variant
 of SPI.  The PIC emulates a set of addressable shift registers that
 correspond to the state of the input/output devices.
 
-http://hp6038frontpanel.googlecode.com/svn/wiki/schematic.png
+![](https://github.com/garlick/hp6038/blob/master/doc/schematic.png)
 
-== GPIB Board Interface ==
+### GPIB Board Interface
 
 The front panel attaches to the GPIB board via a 16-pin ribbon cable.
 The front panel obtains power from the GPIB board.
 
-|| *pin*             || *function*   || *description* ||
-|| 1,4,7,10,15       || +5V          || ||
-|| 3,6,9,12,13,14    || GND          || ||
-|| 2                 || HP_DATADOWN  || serial I/O to front panel ||
-|| 5                 || HP_IOCLOCK   || L=data valid ||
-|| 8                 || HP_DA        || L=address, H=data ||
-|| 11                || HP_DATAUP    || serial I/O from front panel ||
-|| 16                || HP_PCLR      || L=clear shift registers ||
+|pin             |function        |description               |
+--------------------------------------------------------------
+|1,4,7,10,15     | +5V            |                          |
+|3,6,9,12,13,14  | GND            |                          |
+|2               | HP_DATADOWN    |serial I/O to front panel |
+|5               | HP_IOCLOCK     |L=data valid              |
+|8               | HP_DA          |L=address, H=data         |
+|11              | HP_DATAUP      |serial I/O from front panel |
+|16              | HP_PCLR        |L=clear shift registers   |
 
-http://hp6038frontpanel.googlecode.com/svn/wiki/ribbon.png
+![](https://github/com/garlick/hp6038/blob/master/doc/ribbon.png)
 
-Refer to the [protocol Protocol] wiki page.  The handshake employed by the HP
+The handshake employed by the HP
 to move serial data into shift registers is similar to SPI except for the
 additional HP_DA line to designate whether the byte being transferred is
 address or data, and the fact that the HP_DATAUP line must be in a high
@@ -51,26 +53,26 @@ in high-impedance mode afterwards.
 
 As shown in the scope traces on the [protocol Protocol] wiki page,
 the HP drives SCK at a half period of about 1 microsecond.
-Call this T,,sck,,/2.
+Call this T<sub>sck</sub> / 2.
 
 The PIC specification requires that:
 
- T,,sck,,/2 >= T,,cy,, + 20 ns
+T<sub>sck</sub>/2 >= T<sub>cy</sub> + 20 ns
 
-Since T,,cy,, = 4/F,,osc,,, an equivalent statement is:
+Since T<sub>cy</sub> = 4/F<sub>osc</sub>, an equivalent statement is:
 
- T,,sck,,/2 >= 4/F,,osc,, + 20 ns
+T<sub>sck</sub>/2 >= 4/F<sub>osc</sub> + 20 ns
 
 Substiting 1 microsecond (1000 ns) for Tsck/2:
 
- 980 ns >= 4/F,,osc,,
+980 ns >= 4/F<sub>osc</sub>
 
- F,,osc,, >= 4 / (9.80 x 10^-7^ s)
+F<sub>osc</sub> >= 4 / (9.80 x 10<sup>-7</sup> s)
 
- F,,osc,, >= 4.08 x 10^6^ Hz
+F<sub>osc</sub> >= 4.08 x 10<sup>6</sup> Hz
 
-Thus to avoid going below the minimum T,,sck,,/2, the minimum 
-F,,osc,, is 4.08 MHz.
+Thus to avoid going below the minimum T<sub>sck</sub>/2, the minimum 
+F<sub>osc</sub> is 4.08 MHz.
 
 In addition the HP_DA line must be sampled within about 5 microseconds
 after the last bit of a byte is shifted in by SCK.  This is perhaps an even
@@ -79,10 +81,10 @@ from the MSSP, save context, etc., and execute the interrupt
 service routine in time to sample that line.  I did not study this requirement
 in detail but found a 20 MHz oscillator to be adequate.
 
-== LCD ==
+### LCD
 
 The LCD employed in this project uses a 
-[http://ouwehand.net/~peter/lcd/lcd.shtml Hitachi HD44780 compatible]
+[Hitachi HD44780 compatible](http://ouwehand.net/~peter/lcd/lcd.shtml)
 controller chip.  It is configured in 4 byte data mode so only 7 PIC I/O
 pins are consumed by the LCD.
 
@@ -99,22 +101,23 @@ The service manual schematic had the LED segments
 assigned to the wrong shift register bits.
 The correct wiring was deduced through trial and error:
 
-http://hp6038frontpanel.googlecode.com/svn/wiki/led.png
+![](https://github.com/garlick/hp6038/blob/master/doc/led.png)
 
-|| *bit* || *7 segment* || *5 segment* ||
-|| 0 || g || e ||
-|| 1 || c || a ||
-|| 2 || d || b ||
-|| 3 || e || d ||
-|| 4 || a || c ||
-|| 5 || f || ||
-|| 6 || d.p. || ||
-|| 7 || b || ||
+|bit |7 segment |5 segment |
+----------------------------
+|0   |g         |e |
+|1   |c         |a |
+|2   |d         |b |
+|3   |e         |d |
+|4   |a         |c |
+|5   |f         |  |
+|6   |d.p.      |  |
+|7   |b         |  |
 
-== RPG ==
+### RPG
 
 The rotary pulse generator (RPG) or
-[http://en.wikipedia.org/wiki/Rotary_encoder rotary encoder]
+[rotary encoder](http://en.wikipedia.org/wiki/Rotary_encoder)
 is a digital rotary input device with quadrature output that is used
 in the HP 6038A to adjust voltage and current.  It is connected to PIC
 inputs RB6 and RB7 which are configured to interrupt
@@ -126,24 +129,27 @@ the HP can tell how fast and in what direction the knob is turning.
 
 I tried three encoders:
 
- * Encoder Products Co. [http://www.encoder.com/model15th.html FV00233]: 2048 cycles per revolution (CPR), no detents (clicks)
+* Encoder Products Co. [FV00233](http://www.encoder.com/model15th.html):
+2048 cycles per revolution (CPR), no detents (clicks)
 
- * Grayhill [http://www.grayhill.com/catalog/Opt_Encoder_62P.pdf 62P]: 4 CPR, 16 detents
+* Grayhill [62P](http://www.grayhill.com/catalog/Opt_Encoder_62P.pdf):
+4 CPR, 16 detents
 
- * Avago [http://www.avagotech.com/docs/5988-5851EN HRPG-A032]: 32 CPR, 32 detents
+ * Avago [HRPG-A032](http://www.avagotech.com/docs/5988-5851EN):
+32 CPR, 32 detents
 
 I settled on the Avago although I think a bit more resolution might be better.
 Note: with 32 CPR, 32 detents there are actually 128 interrupts per revolution,
 but one can only report one change per detent, or that perfect setting
 between detents remains forever out of reach!
 
-== Switches ==
+### Switches
 
 Five normally open pushbuttons are connected to five inputs on the PIC.
-10K resistors (in a {{{761-1-R10K}}} resistor pack) pull the inputs high when
+10K resistors (in a `761-1-R10K` resistor pack) pull the inputs high when
 the switches are open.  The inputs are grounded when the switches are closed.
 
-== Chassis Mounting ==
+### Chassis Mounting
 
 The HP6038A has an inner and an outer front panel, both alumininum.
 The inner panel is drilled for the front panel option but the outer panel
@@ -154,5 +160,5 @@ the inner panel for LCD and controls.
 I then used the inner panel as a template for drilling holes in the front
 panel.  A friend of mine handled the rectangular hole for the LCD;
 however if you have no friends, this article may be a good starting point:
-[http://makezine.com/extras/15.html Make Square Holes in Aluminum Sheet Metal],
+[Make Square Holes in Aluminum Sheet Metal](http://makezine.com/extras/15.html)
 by Nick Carter for _Make Magazine_.
