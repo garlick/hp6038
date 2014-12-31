@@ -140,7 +140,7 @@ in detail but found a 20 MHz oscillator to be adequate.
 ### LCD
 
 The LCD employed in this project uses a 
-[Hitachi HD44780 compatible](http://ouwehand.net/~peter/lcd/lcd.shtml)
+[Hitachi HD44780 compatible](http://en.wikipedia.org/wiki/Hitachi_HD44780_LCD_controller)
 controller chip.  It is configured in 4 byte data mode so only 7 PIC I/O
 pins are consumed by the LCD.
 
