@@ -3,6 +3,8 @@
 In this project, a headless HP 6038A system power supply gets a
 homebrew front panel for bench use.
 
+![](https://github.com/garlick/hp6038/blob/master/doc/hp6033a.png)
+
 A schematic of the original TTL front panel is available in the
 [HP6033A/38A service manual](http://www.home.agilent.com/agilent/redirector.jspx?action=ref&cname=AGILENT_EDITORIAL&ckey=1000000382-1%3Aepsg%3Aman&lc=eng&cc=US&nfr=-35691.384539), page 99.
 
