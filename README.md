@@ -9,6 +9,61 @@ on the front panel, and communicates with the GPIB board using a variant
 of SPI.  The PIC emulates a set of addressable shift registers that
 correspond to the state of the input/output devices.
 
+### Protocol
+
+The protocol used between front panel and GPIB board was
+inferred from the schematic and a little prodding with a scope.
+
+#### Read Cycle
+
+![](https://github.com/garlick/hp6038/blob/master/doc/print_001.png)
+
+This shows a read I/O cycle between GPIB board and front panel.
+The _foldback_ button is depressed.
+
+`D3` is `DATA_UP` (uninverted, front panel -> GPIB board)
+
+`D2` is `DATA_DOWN` (inverted, GPIB board -> front panel)
+
+`D1` is `D/A'`
+
+`D0` is `IO_CLOCK'`
+
+First 8 bits of address are written MSB first (`D/A`=L).
+Here the address is 0x12 (RPG/pushbuttons register).
+
+Next 8 bits of data are read MSB first (`D/A`=H).
+Here the data is 0xbf.  The single bit that is off corresponds to the
+depressed foldback button (bit 6 of U11).
+
+The read is distinguished from the write by address.
+0x12 is the only read address.
+
+Note that the `IO_CLOCK` runs at about 500 KHz and that there is about
+5 uS between the last `IO_CLOCK` pulse and the transition of `D/A'` from
+low to high.
+
+#### Write Cycle
+
+![](https://github.com/garlick/hp6038/blob/master/doc/print_002.png)
+
+This shows a write I/O cycle between GPIB board and front panel.
+
+`D3` is `DATA_UP` (uninverted, front panel -> GPIB board)
+
+`D2` is `DATA_DOWN'` (inverted, GPIB board -> front panel)
+
+`D1` is `D/A'`
+
+`D0` is `IO_CLOCK'`
+
+First 8 bits of address are written MSB first (`D/A`=L).
+Here the address is 0x11 (second mode indicator register).
+
+Next 8 bits of data are read MSB first (`D/A`=H).
+Here the data is 0xfd.  The single bit that is off corresponds to the
+illuminated _current_ indicator (bit 1 of U10).
+
 ![](https://github.com/garlick/hp6038/blob/master/doc/schematic.png)
 
 ### GPIB Board Interface
