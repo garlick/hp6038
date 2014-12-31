@@ -1,17 +1,20 @@
 ## HP 6038A Front Panel Replacement Hardware
 
-In this project, a headless HP 6038A system power supply gets a
-homebrew front panel for bench use.  This is what the real front
-panel looks like:
-
-![](https://github.com/garlick/hp6038/blob/master/doc/hp6033a.png)
-
-This is the replacement:
+In this project, a headless HP 6038A system power supply (option 001)
+gets a homebrew front panel for bench use:
 
 ![](https://github.com/garlick/hp6038/blob/master/doc/P1010598_small.PNG)
 
+while the original looks like this:
+
+![](https://github.com/garlick/hp6038/blob/master/doc/hp6033a.png)
+
 A schematic of the original TTL front panel is available in the
-[HP6033A/38A service manual](http://www.home.agilent.com/agilent/redirector.jspx?action=ref&cname=AGILENT_EDITORIAL&ckey=1000000382-1%3Aepsg%3Aman&lc=eng&cc=US&nfr=-35691.384539), page 99.
+[HP6033A/38A service manual](http://www.home.agilent.com/agilent/redirector.jspx?action=ref&cname=AGILENT_EDITORIAL&ckey=1000000382-1%3Aepsg%3Aman&lc=eng&cc=US&nfr=-35691.384539), page 99.  A long while ago I wire wrapped this from
+the schematic, but the power supply with detached front panel was not very
+usable as a bench instrument:
+
+![](https://github.com/garlick/hp6038/blob/master/doc/P1010608_small.PNG)
 
 The heart of the replacement front panel is the
 [PIC 16F873A](http://www.microchip.com/wwwproducts/Devices.aspx?dDocName=en010236). In a nutshell, the PIC interfaces with the various input/output devices
