@@ -17,13 +17,10 @@ The heart of the replacement front panel is the
 on the front panel, and communicates with the GPIB board using a variant
 of SPI.  The PIC emulates a set of addressable shift registers that
 correspond to the state of the input/output devices.
-
-### Protocol
-
 The protocol used between front panel and GPIB board was
 inferred from the schematic and a little prodding with a scope.
 
-#### Read Cycle
+### Read Cycle
 
 ![](https://github.com/garlick/hp6038/blob/master/doc/print_001.png)
 
@@ -52,7 +49,7 @@ Note that the `IO_CLOCK` runs at about 500 KHz and that there is about
 5 uS between the last `IO_CLOCK` pulse and the transition of `D/A'` from
 low to high.
 
-#### Write Cycle
+### Write Cycle
 
 ![](https://github.com/garlick/hp6038/blob/master/doc/print_002.png)
 
